@@ -21,6 +21,7 @@ if not os.path.isfile(mooc_all_scm):
   mooc_all_scm_fp = open(mooc_all_scm, "w")
 
   with open(mooc_actions_tsv) as f:
+    next(f)
     for line in f:
       content = line.split("\t")
       action_id = content[0].strip()
@@ -32,6 +33,7 @@ if not os.path.isfile(mooc_all_scm):
       mooc_all_scm_fp.write(atomese_2)
 
   with open(mooc_action_labels_tsv) as f:
+    next(f)
     for line in f:
       content = line.split("\t")
       action_id = content[0].strip()
@@ -48,6 +50,7 @@ if not os.path.isfile(mooc_all_scm):
       return evalink("has_feature",
                      action_id_prefix + action_id,
                      feature_prefix + str(features.index(feature)))
+    next(f)
     for line in f:
       content = line.split("\t")
       action_id = content[0].strip()
