@@ -1,4 +1,6 @@
 import os
+from opencog.atomspace import AtomSpace
+from opencog.scheme_wrapper import scheme_eval
 
 mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
 mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
@@ -17,6 +19,15 @@ def evalink(pred, node1, node2):
                     "\t\t(ConceptNode \"" + node1 + "\")",
                     "\t\t(ConceptNode \"" + node2 + "\")))\n"])
 
+### Initialize AtomSpace ###
+atomspace = AtomSpace()
+
+### Guile setup ###
+scheme_eval(atomspace, "(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
+scheme_eval(atomspace, "(add-to-load-path \".\")")
+scheme_eval(atomspace, "(use-modules (opencog) (opencog bioscience) (opencog pln))")
+
+### Load dataset ###
 if not os.path.isfile(mooc_all_scm):
   mooc_all_scm_fp = open(mooc_all_scm, "w")
 
@@ -31,6 +42,8 @@ if not os.path.isfile(mooc_all_scm):
       atomese_2 = evalink("has_target", action_id_prefix + action_id, target_id_prefix + target_id)
       mooc_all_scm_fp.write(atomese_1)
       mooc_all_scm_fp.write(atomese_2)
+      scheme_eval(atomspace, atomese_1)
+      scheme_eval(atomspace, atomese_2)
 
   with open(mooc_action_labels_tsv) as f:
     next(f)
@@ -41,6 +54,7 @@ if not os.path.isfile(mooc_all_scm):
       if label == "1":
         atomese = evalink("leads_to", action_id_prefix + action_id, "dropout")
         mooc_all_scm_fp.write(atomese)
+        scheme_eval(atomspace, atomese)
 
   features = []
   with open(mooc_action_features_tsv) as f:
@@ -62,5 +76,15 @@ if not os.path.isfile(mooc_all_scm):
       atomese_2 = process_feature(action_id, feature_1)
       atomese_3 = process_feature(action_id, feature_2)
       atomese_4 = process_feature(action_id, feature_3)
+      mooc_all_scm_fp.write(atomese_1)
+      mooc_all_scm_fp.write(atomese_2)
+      mooc_all_scm_fp.write(atomese_3)
+      mooc_all_scm_fp.write(atomese_4)
+      scheme_eval(atomspace, atomese_1)
+      scheme_eval(atomspace, atomese_2)
+      scheme_eval(atomspace, atomese_3)
+      scheme_eval(atomspace, atomese_4)
 
   mooc_all_scm_fp.close()
+else:
+  scheme_eval(atomspace, "(primitive-load \"" + mooc_all_scm + "\")")
