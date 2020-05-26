@@ -1,5 +1,5 @@
 import os
-from opencog.atomspace import AtomSpace
+from opencog.atomspace import AtomSpace, types
 from opencog.scheme_wrapper import scheme_eval
 
 mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
@@ -19,13 +19,16 @@ def evalink(pred, node1, node2):
                     "\t\t(ConceptNode \"" + node1 + "\")",
                     "\t\t(ConceptNode \"" + node2 + "\")))\n"])
 
+def scm(atomese):
+  return scheme_eval(atomspace, atomese).decode("utf-8")
+
 ### Initialize AtomSpace ###
 atomspace = AtomSpace()
 
 ### Guile setup ###
-scheme_eval(atomspace, "(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
-scheme_eval(atomspace, "(add-to-load-path \".\")")
-scheme_eval(atomspace, "(use-modules (opencog) (opencog bioscience) (opencog pln))")
+scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
+scm("(add-to-load-path \".\")")
+scm("(use-modules (opencog) (opencog bioscience) (opencog pln))")
 
 ### Load dataset ###
 if not os.path.isfile(mooc_all_scm):
@@ -42,8 +45,8 @@ if not os.path.isfile(mooc_all_scm):
       atomese_2 = evalink("has_target", action_id_prefix + action_id, target_id_prefix + target_id)
       mooc_all_scm_fp.write(atomese_1)
       mooc_all_scm_fp.write(atomese_2)
-      scheme_eval(atomspace, atomese_1)
-      scheme_eval(atomspace, atomese_2)
+      scm(atomese_1)
+      scm(atomese_2)
 
   with open(mooc_action_labels_tsv) as f:
     next(f)
@@ -54,7 +57,7 @@ if not os.path.isfile(mooc_all_scm):
       if label == "1":
         atomese = evalink("leads_to", action_id_prefix + action_id, "dropout")
         mooc_all_scm_fp.write(atomese)
-        scheme_eval(atomspace, atomese)
+        scm(atomese)
 
   features = []
   with open(mooc_action_features_tsv) as f:
@@ -80,11 +83,13 @@ if not os.path.isfile(mooc_all_scm):
       mooc_all_scm_fp.write(atomese_2)
       mooc_all_scm_fp.write(atomese_3)
       mooc_all_scm_fp.write(atomese_4)
-      scheme_eval(atomspace, atomese_1)
-      scheme_eval(atomspace, atomese_2)
-      scheme_eval(atomspace, atomese_3)
-      scheme_eval(atomspace, atomese_4)
+      scm(atomese_1)
+      scm(atomese_2)
+      scm(atomese_3)
+      scm(atomese_4)
 
   mooc_all_scm_fp.close()
 else:
-  scheme_eval(atomspace, "(primitive-load \"" + mooc_all_scm + "\")")
+  print("--- Loading dataset...")
+  scm("(use-modules (opencog persist-file))")
+  scm("(load-file \"" + mooc_all_scm + "\")")
