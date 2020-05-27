@@ -1,6 +1,8 @@
 import os
 from opencog.atomspace import AtomSpace, types
 from opencog.scheme_wrapper import scheme_eval
+from opencog.type_constructors import *
+from opencog.utilities import initialize_opencog
 
 mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
 mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
@@ -22,8 +24,9 @@ def evalink(pred, node1, node2):
 def scm(atomese):
   return scheme_eval(atomspace, atomese).decode("utf-8")
 
-### Initialize AtomSpace ###
+### Initialize the AtomSpace ###
 atomspace = AtomSpace()
+initialize_opencog(atomspace)
 
 ### Guile setup ###
 scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
@@ -93,3 +96,43 @@ else:
   print("--- Loading dataset...")
   scm("(use-modules (opencog persist-file))")
   scm("(load-file \"" + mooc_all_scm + "\")")
+
+### Pre-processing ###
+# Turn EvaluationLinks -> MemberLinks -> InheritanceLinks
+# TODO: Use/Turn them into actual PLN rules
+print("--- Creating InheritanceLinks...")
+for el in atomspace.get_atoms_by_type(types.EvaluationLink):
+  pred = el.out[0]
+  source = el.out[1].out[0]
+  target = el.out[1].out[1]
+  var_x = VariableNode("$X")
+  var_y = VariableNode("$Y")
+  MemberLink(
+    source,
+    SatisfyingSetScopeLink(
+      var_x,
+      EvaluationLink(
+        pred,
+        ListLink(
+          var_x,
+          target))))
+  MemberLink(
+    target,
+    SatisfyingSetScopeLink(
+      var_y,
+      EvaluationLink(
+        pred,
+        ListLink(
+          source,
+          var_y))))
+for memberlink in atomspace.get_atoms_by_type(types.MemberLink):
+  memb = memberlink.out[0]
+  satset = memberlink.out[1]
+  evalink = satset.out[1]
+  pred_name = evalink.out[0].name
+  source_name = evalink.out[1].out[0].name
+  target_name = evalink.out[1].out[1].name
+  concept_name = "-".join([pred_name, source_name, target_name])
+  # Create a new ConceptNode for each of the unique satisfying set
+  concept = ConceptNode(concept_name)
+  InheritanceLink(memb, concept)
