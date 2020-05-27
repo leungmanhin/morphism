@@ -9,10 +9,10 @@ mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
 mooc_action_features_tsv = os.getcwd() + "/datasets/mooc_action_features.tsv"
 mooc_all_scm = os.getcwd() + "/datasets/mooc_all.scm"
 
-user_id_prefix = "user-"
-action_id_prefix = "action-"
-target_id_prefix = "target-"
-feature_prefix = "feature-"
+user_id_prefix = "user:"
+action_id_prefix = "action:"
+target_id_prefix = "target:"
+feature_prefix = "feature:"
 
 def evalink(pred, node1, node2):
   return "\n".join(["(EvaluationLink",
@@ -34,6 +34,7 @@ scm("(add-to-load-path \".\")")
 scm("(use-modules (opencog) (opencog bioscience) (opencog pln))")
 
 ### Load dataset ###
+print("--- Loading dataset...")
 if not os.path.isfile(mooc_all_scm):
   mooc_all_scm_fp = open(mooc_all_scm, "w")
 
@@ -93,14 +94,13 @@ if not os.path.isfile(mooc_all_scm):
 
   mooc_all_scm_fp.close()
 else:
-  print("--- Loading dataset...")
   scm("(use-modules (opencog persist-file))")
   scm("(load-file \"" + mooc_all_scm + "\")")
 
 ### Pre-processing ###
-# Turn EvaluationLinks -> MemberLinks -> InheritanceLinks
-# TODO: Use/Turn them into actual PLN rules
-print("--- Creating InheritanceLinks...")
+# Translate EvaluationLinks -> MemberLinks -> InheritanceLinks -> SubsetLinks
+# TODO: Use/Turn the below into actual PLN rules
+print("--- Translating links...")
 for el in atomspace.get_atoms_by_type(types.EvaluationLink):
   pred = el.out[0]
   source = el.out[1].out[0]
@@ -132,7 +132,11 @@ for memberlink in atomspace.get_atoms_by_type(types.MemberLink):
   pred_name = evalink.out[0].name
   source_name = evalink.out[1].out[0].name
   target_name = evalink.out[1].out[1].name
-  concept_name = "-".join([pred_name, source_name, target_name])
+  concept_name = "-".join([source_name, pred_name, target_name])
   # Create a new ConceptNode for each of the unique satisfying set
   concept = ConceptNode(concept_name)
   InheritanceLink(memb, concept)
+for inhlink in atomspace.get_atoms_by_type(types.InheritanceLink):
+  child = inhlink.out[0]
+  parent = inhlink.out[1]
+  SubsetLink(child, parent)
