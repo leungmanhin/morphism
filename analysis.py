@@ -98,45 +98,11 @@ else:
   scm("(load-file \"" + mooc_all_scm + "\")")
 
 ### Pre-processing ###
-# Translate EvaluationLinks -> MemberLinks -> InheritanceLinks -> SubsetLinks
 # TODO: Use/Turn the below into actual PLN rules
 print("--- Translating links...")
+# Minimum translation -- directly turn EvaluationLink relations into SubsetLinks, which generates
+# what's needed for the experiment. The satisfying sets (meta-concepts) will not be generated here.
 for el in atomspace.get_atoms_by_type(types.EvaluationLink):
-  pred = el.out[0]
   source = el.out[1].out[0]
   target = el.out[1].out[1]
-  var_x = VariableNode("$X")
-  var_y = VariableNode("$Y")
-  MemberLink(
-    source,
-    SatisfyingSetScopeLink(
-      var_x,
-      EvaluationLink(
-        pred,
-        ListLink(
-          var_x,
-          target))))
-  MemberLink(
-    target,
-    SatisfyingSetScopeLink(
-      var_y,
-      EvaluationLink(
-        pred,
-        ListLink(
-          source,
-          var_y))))
-for memberlink in atomspace.get_atoms_by_type(types.MemberLink):
-  memb = memberlink.out[0]
-  satset = memberlink.out[1]
-  evalink = satset.out[1]
-  pred_name = evalink.out[0].name
-  source_name = evalink.out[1].out[0].name
-  target_name = evalink.out[1].out[1].name
-  concept_name = "-".join([source_name, pred_name, target_name])
-  # Create a new ConceptNode for each of the unique satisfying set
-  concept = ConceptNode(concept_name)
-  InheritanceLink(memb, concept)
-for inhlink in atomspace.get_atoms_by_type(types.InheritanceLink):
-  child = inhlink.out[0]
-  parent = inhlink.out[1]
-  SubsetLink(child, parent)
+  SubsetLink(target, source)
