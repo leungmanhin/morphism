@@ -162,3 +162,17 @@ for action in actions:
 # Infer inverse SubsetLinks
 print("--- Inferring inverse SubsetLinks...")
 scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
+
+# Infer Attractions
+print("--- Inferring AttractionLinks...")
+scm("(pln-load 'empty)")
+scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
+scm(" ".join(["(pln-bc",
+                "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
+                "#:vardecl",
+                  "(VariableSet",
+                    "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+                    "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                "#:maximum-iterations 12",
+                "#:complexity-penalty 10)"]))
