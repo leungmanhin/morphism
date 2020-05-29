@@ -24,6 +24,27 @@ def evalink(pred, node1, node2):
 def scm(atomese):
   return scheme_eval(atomspace, atomese).decode("utf-8")
 
+def get_concepts(name_prefix):
+  return list(
+           filter(
+             lambda x : x.name.startswith(name_prefix),
+             atomspace.get_atoms_by_type(types.ConceptNode)))
+
+def get_subsets(node):
+  return list(
+           filter(
+             lambda x : x.type == types.SubsetLink and x.out[1] == node,
+             node.incoming))
+
+def get_patterns(node):
+  return [x.out[0] for x in get_subsets(node)]
+
+def tv_mean(node, usize):
+  return len(get_patterns(node)) / usize
+
+def tv_confidence(cnt):
+  return float(scm("(count->confidence " + str(cnt) + ")"))
+
 ### Initialize the AtomSpace ###
 atomspace = AtomSpace()
 initialize_opencog(atomspace)
@@ -32,6 +53,7 @@ initialize_opencog(atomspace)
 scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
 scm("(add-to-load-path \".\")")
 scm("(use-modules (opencog) (opencog bioscience) (opencog pln))")
+scm("(load \"utils.scm\")")
 
 ### Load dataset ###
 print("--- Loading dataset...")
@@ -106,3 +128,37 @@ for el in atomspace.get_atoms_by_type(types.EvaluationLink):
   source = el.out[1].out[0]
   target = el.out[1].out[1]
   SubsetLink(target, source)
+
+# Infer new subsets via transitivy
+print("--- Inferring new subsets...")
+scm("(pln-load 'empty)")
+scm("(pln-load-from-path \"transitivity.scm\")")
+# (Subset C1 C2) (Subset C2 C3) |- (Subset C1 C3)
+scm("(pln-add-rule-by-name \"present-subset-transitivity-rule\")")
+scm(" ".join(["(pln-fc",
+                "(Subset (Variable \"$X\") (Variable \"$Y\"))",
+                "#:vardecl",
+                  "(VariableSet",
+                    "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+                    "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                "#:maximum-iterations 10",
+                "#:fc-full-rule-application #t)"]))
+
+# Calculate & assign TVs
+print("--- Calculating and assigning TVs...")
+for subsetlink in atomspace.get_atoms_by_type(types.SubsetLink):
+  subsetlink.tv = TruthValue(1, 1)
+users = get_concepts(user_id_prefix)
+actions = get_concepts(action_id_prefix)
+user_universe_size = len(atomspace.get_atoms_by_type(types.ConceptNode)) - len(users)
+action_universe_size = user_universe_size - len(actions)
+for user in users:
+  tv = TruthValue(tv_mean(user, user_universe_size), tv_confidence(user_universe_size))
+  user.tv = tv
+for action in actions:
+  tv = TruthValue(tv_mean(action, action_universe_size), tv_confidence(action_universe_size))
+  action.tv = tv
+
+# Infer inverse SubsetLinks
+print("--- Inferring inverse SubsetLinks...")
+scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
