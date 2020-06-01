@@ -1,4 +1,5 @@
 import os
+import pickle
 from opencog.atomspace import AtomSpace, types
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
@@ -44,6 +45,18 @@ def tv_mean(node, usize):
 
 def tv_confidence(cnt):
   return float(scm("(count->confidence " + str(cnt) + ")"))
+
+def get_reverse_pred(pred):
+  if pred == "takes":
+    return "is_taken_by"
+  elif pred == "has_target":
+    return "is_a_target_of"
+  elif pred == "has_feature":
+    return "is_a_feature_of"
+  elif pred == "leads_to":
+    return "is_led_by"
+  else:
+    raise Exception("The reverse of predicate \"{}\" is not defined!".format(pred))
 
 ### Initialize the AtomSpace ###
 atomspace = AtomSpace()
@@ -176,3 +189,16 @@ scm(" ".join(["(pln-bc",
                     "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
                 "#:maximum-iterations 12",
                 "#:complexity-penalty 10)"]))
+
+### DeepWalk ###
+# Generate the sentences for model training
+print("--- Generating sentences...")
+sentences = []
+evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
+for evalink in evalinks:
+  pred = evalink.out[0].name
+  rev_pred = get_reverse_pred(pred)
+  source = evalink.out[1].out[0].name
+  target = evalink.out[1].out[1].name
+  sentences.append([source, pred, target])
+  sentences.append([target, rev_pred, source])
