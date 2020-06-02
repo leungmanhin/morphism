@@ -9,8 +9,10 @@ from opencog.utilities import initialize_opencog
 mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
 mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
 mooc_action_features_tsv = os.getcwd() + "/datasets/mooc_action_features.tsv"
-mooc_all_scm = os.getcwd() + "/datasets/mooc_all.scm"
-deep_walk_model = os.getcwd() + "/results/deepwalk.bin"
+atomese_mooc_scm = os.getcwd() + "/datasets/atomese-mooc.scm"
+atomese_preprocessed_scm = os.getcwd() + "/results/atomese-preprocessed.scm"
+deepwalk_sentences = os.getcwd() + "/datasets/deepwalk_sentences.pickle"
+deepwalk_model = os.getcwd() + "/results/deepwalk.bin"
 
 user_id_prefix = "user:"
 action_id_prefix = "action:"
@@ -71,9 +73,9 @@ scm("(use-modules (opencog) (opencog bioscience) (opencog pln))")
 scm("(load \"utils.scm\")")
 
 ### Load dataset ###
-print("--- Loading dataset...")
-if not os.path.isfile(mooc_all_scm):
-  mooc_all_scm_fp = open(mooc_all_scm, "w")
+if not os.path.isfile(atomese_mooc_scm):
+  print("--- Generating Atomese from dataset...")
+  atomese_mooc_scm_fp = open(atomese_mooc_scm, "w")
 
   with open(mooc_actions_tsv) as f:
     next(f)
@@ -84,8 +86,8 @@ if not os.path.isfile(mooc_all_scm):
       target_id = content[2].strip()
       atomese_1 = evalink("takes", user_id_prefix + user_id, action_id_prefix + action_id)
       atomese_2 = evalink("has_target", action_id_prefix + action_id, target_id_prefix + target_id)
-      mooc_all_scm_fp.write(atomese_1)
-      mooc_all_scm_fp.write(atomese_2)
+      atomese_mooc_scm_fp.write(atomese_1)
+      atomese_mooc_scm_fp.write(atomese_2)
       scm(atomese_1)
       scm(atomese_2)
 
@@ -97,7 +99,7 @@ if not os.path.isfile(mooc_all_scm):
       label = content[1].strip()
       if label == "1":
         atomese = evalink("leads_to", action_id_prefix + action_id, "dropout")
-        mooc_all_scm_fp.write(atomese)
+        atomese_mooc_scm_fp.write(atomese)
         scm(atomese)
 
   features = []
@@ -120,95 +122,110 @@ if not os.path.isfile(mooc_all_scm):
       atomese_2 = process_feature(action_id, feature_1)
       atomese_3 = process_feature(action_id, feature_2)
       atomese_4 = process_feature(action_id, feature_3)
-      mooc_all_scm_fp.write(atomese_1)
-      mooc_all_scm_fp.write(atomese_2)
-      mooc_all_scm_fp.write(atomese_3)
-      mooc_all_scm_fp.write(atomese_4)
+      atomese_mooc_scm_fp.write(atomese_1)
+      atomese_mooc_scm_fp.write(atomese_2)
+      atomese_mooc_scm_fp.write(atomese_3)
+      atomese_mooc_scm_fp.write(atomese_4)
       scm(atomese_1)
       scm(atomese_2)
       scm(atomese_3)
       scm(atomese_4)
 
-  mooc_all_scm_fp.close()
+  atomese_mooc_scm_fp.close()
 else:
+  print("--- Loading dataset Atomese from \"{}\"...".format(atomese_mooc_scm))
   scm("(use-modules (opencog persist-file))")
-  scm("(load-file \"" + mooc_all_scm + "\")")
+  scm("(load-file \"" + atomese_mooc_scm + "\")")
 
 ### Pre-processing ###
-# TODO: Use/Turn the below into actual PLN rules
-print("--- Translating links...")
-# Minimum translation -- directly turn EvaluationLink relations into SubsetLinks, which generates
-# what's needed for the experiment. The satisfying sets (meta-concepts) will not be generated here.
-for el in atomspace.get_atoms_by_type(types.EvaluationLink):
-  source = el.out[1].out[0]
-  target = el.out[1].out[1]
-  SubsetLink(target, source)
+if os.path.isfile(atomese_preprocessed_scm):
+  print("--- Loading PLN-preprocessed Atomese from \"{}\"...".format(atomese_preprocessed_scm))
+  scm("(use-modules (opencog persist-file))")
+  scm("(load-file \"" + atomese_preprocessed_scm + "\")")
+else:
+  # TODO: Use/Turn the below into actual PLN rules
+  print("--- Translating links...")
+  # Minimum translation -- directly turn EvaluationLink relations into SubsetLinks, which generates
+  # what's needed for the experiment. The satisfying sets (meta-concepts) will not be generated here.
+  for el in atomspace.get_atoms_by_type(types.EvaluationLink):
+    source = el.out[1].out[0]
+    target = el.out[1].out[1]
+    SubsetLink(target, source)
 
-# Infer new subsets via transitivy
-print("--- Inferring new subsets...")
-scm("(pln-load 'empty)")
-scm("(pln-load-from-path \"transitivity.scm\")")
-# (Subset C1 C2) (Subset C2 C3) |- (Subset C1 C3)
-scm("(pln-add-rule-by-name \"present-subset-transitivity-rule\")")
-scm(" ".join(["(pln-fc",
-                "(Subset (Variable \"$X\") (Variable \"$Y\"))",
-                "#:vardecl",
-                  "(VariableSet",
-                    "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
-                    "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
-                "#:maximum-iterations 10",
-                "#:fc-full-rule-application #t)"]))
+  # Infer new subsets via transitivy
+  print("--- Inferring new subsets...")
+  scm("(pln-load 'empty)")
+  scm("(pln-load-from-path \"transitivity.scm\")")
+  # (Subset C1 C2) (Subset C2 C3) |- (Subset C1 C3)
+  scm("(pln-add-rule-by-name \"present-subset-transitivity-rule\")")
+  scm(" ".join(["(pln-fc",
+                  "(Subset (Variable \"$X\") (Variable \"$Y\"))",
+                  "#:vardecl",
+                    "(VariableSet",
+                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                  "#:maximum-iterations 10",
+                  "#:fc-full-rule-application #t)"]))
 
-# Calculate & assign TVs
-print("--- Calculating and assigning TVs...")
-for subsetlink in atomspace.get_atoms_by_type(types.SubsetLink):
-  subsetlink.tv = TruthValue(1, 1)
-users = get_concepts(user_id_prefix)
-actions = get_concepts(action_id_prefix)
-user_universe_size = len(atomspace.get_atoms_by_type(types.ConceptNode)) - len(users)
-action_universe_size = user_universe_size - len(actions)
-for user in users:
-  tv = TruthValue(tv_mean(user, user_universe_size), tv_confidence(user_universe_size))
-  user.tv = tv
-for action in actions:
-  tv = TruthValue(tv_mean(action, action_universe_size), tv_confidence(action_universe_size))
-  action.tv = tv
+  # Calculate & assign TVs
+  print("--- Calculating and assigning TVs...")
+  for subsetlink in atomspace.get_atoms_by_type(types.SubsetLink):
+    subsetlink.tv = TruthValue(1, 1)
+  users = get_concepts(user_id_prefix)
+  actions = get_concepts(action_id_prefix)
+  user_universe_size = len(atomspace.get_atoms_by_type(types.ConceptNode)) - len(users)
+  action_universe_size = user_universe_size - len(actions)
+  for user in users:
+    tv = TruthValue(tv_mean(user, user_universe_size), tv_confidence(user_universe_size))
+    user.tv = tv
+  for action in actions:
+    tv = TruthValue(tv_mean(action, action_universe_size), tv_confidence(action_universe_size))
+    action.tv = tv
 
-# Infer inverse SubsetLinks
-print("--- Inferring inverse SubsetLinks...")
-scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
+  # Infer inverse SubsetLinks
+  print("--- Inferring inverse SubsetLinks...")
+  scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
 
-# Infer Attractions
-print("--- Inferring AttractionLinks...")
-scm("(pln-load 'empty)")
-scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
-scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
-scm(" ".join(["(pln-bc",
-                "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
-                "#:vardecl",
-                  "(VariableSet",
-                    "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
-                    "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
-                "#:maximum-iterations 12",
-                "#:complexity-penalty 10)"]))
+  # Infer Attractions
+  print("--- Inferring AttractionLinks...")
+  scm("(pln-load 'empty)")
+  scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+  scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
+  scm(" ".join(["(pln-bc",
+                  "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
+                  "#:vardecl",
+                    "(VariableSet",
+                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                  "#:maximum-iterations 12",
+                  "#:complexity-penalty 10)"]))
 
 ### DeepWalk ###
 # Generate the sentences for model training
-print("--- Generating sentences...")
 sentences = []
-evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
-for evalink in evalinks:
-  pred = evalink.out[0].name
-  rev_pred = get_reverse_pred(pred)
-  source = evalink.out[1].out[0].name
-  target = evalink.out[1].out[1].name
-  sentences.append([source, pred, target])
-  sentences.append([target, rev_pred, source])
+if os.path.exists(deepwalk_sentences):
+  print("--- Loading generated sentences from \"{}\"...".format(deepwalk_sentences))
+  with open(deepwalk_sentences, "rb") as f:
+    sentences = pickle.load(f)
+else:
+  print("--- Generating sentences...")
+  evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
+  for evalink in evalinks:
+    pred = evalink.out[0].name
+    rev_pred = get_reverse_pred(pred)
+    source = evalink.out[1].out[0].name
+    target = evalink.out[1].out[1].name
+    sentences.append([source, pred, target])
+    sentences.append([target, rev_pred, source])
+  print("--- Total number of sentences generated: {}".format(len(sentences)))
+  with open(deepwalk_sentences, "wb") as f:
+    pickle.dump(sentences, f)
 
 # Train a Word2Vec model
-print("--- Training/Loading model...")
-if os.path.exists(deep_walk_model):
-  deepwalk = Word2Vec.load(deep_walk_model)
+if os.path.exists(deepwalk_model):
+  print("--- Loading existing model from \"{}\"...".format(deepwalk_model))
+  deepwalk = Word2Vec.load(deepwalk_model)
 else:
+  print("--- Training model...")
   deepwalk = Word2Vec(sentences, min_count=1)
-  deepwalk.save(deep_walk_model)
+  deepwalk.save(deepwalk_model)
