@@ -1,5 +1,6 @@
 import os
 import pickle
+from gensim.models import Word2Vec
 from opencog.atomspace import AtomSpace, types
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
@@ -9,6 +10,7 @@ mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
 mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
 mooc_action_features_tsv = os.getcwd() + "/datasets/mooc_action_features.tsv"
 mooc_all_scm = os.getcwd() + "/datasets/mooc_all.scm"
+deep_walk_model = os.getcwd() + "/results/deepwalk.bin"
 
 user_id_prefix = "user:"
 action_id_prefix = "action:"
@@ -202,3 +204,11 @@ for evalink in evalinks:
   target = evalink.out[1].out[1].name
   sentences.append([source, pred, target])
   sentences.append([target, rev_pred, source])
+
+# Train a Word2Vec model
+print("--- Training/Loading model...")
+if os.path.exists(deep_walk_model):
+  deepwalk = Word2Vec.load(deep_walk_model)
+else:
+  deepwalk = Word2Vec(sentences, min_count=1)
+  deepwalk.save(deep_walk_model)
