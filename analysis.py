@@ -1,10 +1,12 @@
 import os
 import pickle
+import random
 from gensim.models import Word2Vec
 from opencog.atomspace import AtomSpace, types
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
+from scipy.spatial import distance
 
 mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
 mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
@@ -13,6 +15,7 @@ atomese_mooc_scm = os.getcwd() + "/datasets/atomese-mooc.scm"
 atomese_preprocessed_scm = os.getcwd() + "/results/atomese-preprocessed.scm"
 deepwalk_sentences = os.getcwd() + "/datasets/deepwalk_sentences.pickle"
 deepwalk_model = os.getcwd() + "/results/deepwalk.bin"
+results_csv = os.getcwd() + "/results/results.csv"
 
 user_id_prefix = "user:"
 action_id_prefix = "action:"
@@ -69,7 +72,7 @@ initialize_opencog(atomspace)
 ### Guile setup ###
 scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
 scm("(add-to-load-path \".\")")
-scm("(use-modules (opencog) (opencog bioscience) (opencog pln))")
+scm("(use-modules (opencog) (opencog bioscience) (opencog pln) (opencog persist-file))")
 scm("(load \"utils.scm\")")
 
 ### Load dataset ###
@@ -134,25 +137,23 @@ if not os.path.isfile(atomese_mooc_scm):
   atomese_mooc_scm_fp.close()
 else:
   print("--- Loading dataset Atomese from \"{}\"...".format(atomese_mooc_scm))
-  scm("(use-modules (opencog persist-file))")
   scm("(load-file \"" + atomese_mooc_scm + "\")")
 
 ### Pre-processing ###
 if os.path.isfile(atomese_preprocessed_scm):
   print("--- Loading PLN-preprocessed Atomese from \"{}\"...".format(atomese_preprocessed_scm))
-  scm("(use-modules (opencog persist-file))")
   scm("(load-file \"" + atomese_preprocessed_scm + "\")")
 else:
-  # TODO: Use/Turn the below into actual PLN rules
-  print("--- Translating links...")
+  print("--- Translating EvaluationLinks into SubsetLinks...")
   # Minimum translation -- directly turn EvaluationLink relations into SubsetLinks, which generates
   # what's needed for the experiment. The satisfying sets (meta-concepts) will not be generated here.
+  # TODO: Turn the below into actual PLN rules
   for el in atomspace.get_atoms_by_type(types.EvaluationLink):
     source = el.out[1].out[0]
     target = el.out[1].out[1]
     SubsetLink(target, source)
 
-  # Infer new subsets via transitivy
+  # Infer new subsets via transitivity
   print("--- Inferring new subsets...")
   scm("(pln-load 'empty)")
   scm("(pln-load-from-path \"transitivity.scm\")")
@@ -186,7 +187,7 @@ else:
   print("--- Inferring inverse SubsetLinks...")
   scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
 
-  # Infer Attractions
+  # Infer AttractionLinks
   print("--- Inferring AttractionLinks...")
   scm("(pln-load 'empty)")
   scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
@@ -229,3 +230,60 @@ else:
   print("--- Training model...")
   deepwalk = Word2Vec(sentences, min_count=1)
   deepwalk.save(deepwalk_model)
+
+### Compare: PLN vs DW ###
+# Get the user pairs
+users = [x.name for x in get_concepts(user_id_prefix)]
+random.shuffle(users)
+user_pairs = list(zip(users[::2], users[1::2]))
+
+# PLN setup
+scm("(pln-load 'empty)")
+scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule\")")
+
+# Output file
+results_csv_fp = open(results_csv, "w")
+first_row = ",".join([
+  "Pair",
+  "P1 patterns",
+  "P2 patterns",
+  "Common patterns",
+  "IntDiff strength",
+  "IntDiff confidence",
+  "Vector distance"])
+results_csv_fp.write(first_row + "\n")
+
+# Generate the results
+for pair in user_pairs:
+  p1 = pair[0]
+  p2 = pair[1]
+  p1_patterns = get_patterns(ConceptNode(p1))
+  p2_patterns = get_patterns(ConceptNode(p2))
+  p1_pattern_size = len(p1_patterns)
+  p2_pattern_size = len(p2_patterns)
+  common_patterns = set(p1_patterns).intersection(p2_patterns)
+  common_pattern_size = len(common_patterns)
+  # PLN intensional difference
+  intdiff = scm(" ".join([
+    "(define bc",
+      "(gar",
+        "(pln-bc",
+          "(IntensionalDifference",
+            "(Concept \"" + p1 + "\")",
+            "(Concept \"" + p2 + "\")))))"]))
+  tv_mean = float(scm("(cog-mean bc)"))
+  tv_conf = float(scm("(cog-confidence bc)"))
+  # DeepWalk euclidean distance
+  v1 = deepwalk[p1]
+  v2 = deepwalk[p2]
+  vec_dist = distance.euclidean(v1, v2)
+  row = ",".join([
+    p1 + " " + p2,
+    str(p1_pattern_size),
+    str(p2_pattern_size),
+    str(common_pattern_size),
+    str(tv_mean),
+    str(tv_conf),
+    str(vec_dist)])
+  results_csv_fp.write(row + "\n")
+results_csv_fp.close()
