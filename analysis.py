@@ -65,6 +65,18 @@ def get_reverse_pred(pred):
   else:
     raise Exception("The reverse of predicate \"{}\" is not defined!".format(pred))
 
+def intensional_difference(c1, c2):
+  intdiff = scm(" ".join([
+    "(define bc",
+      "(gar",
+        "(pln-bc",
+          "(IntensionalDifference",
+            "(Concept \"" + c1 + "\")",
+            "(Concept \"" + c2 + "\")))))"]))
+  tv_mean = float(scm("(cog-mean bc)"))
+  tv_conf = float(scm("(cog-confidence bc)"))
+  return TruthValue(tv_mean, tv_conf)
+
 ### Initialize the AtomSpace ###
 atomspace = AtomSpace()
 initialize_opencog(atomspace)
@@ -74,9 +86,19 @@ scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
 scm("(add-to-load-path \".\")")
 scm("(use-modules (opencog) (opencog bioscience) (opencog pln) (opencog persist-file))")
 scm("(load \"utils.scm\")")
+scm(" ".join([
+  "(define (write-atoms-to-file file atoms)",
+    "(define fp (open-output-file file))",
+    "(for-each",
+      "(lambda (x) (display x fp))",
+      "atoms)",
+    "(close-port fp))"]))
 
 ### Load dataset ###
-if not os.path.isfile(atomese_mooc_scm):
+if os.path.isfile(atomese_mooc_scm):
+  print("--- Loading dataset Atomese from \"{}\"...".format(atomese_mooc_scm))
+  scm("(load-file \"" + atomese_mooc_scm + "\")")
+else:
   print("--- Generating Atomese from dataset...")
   atomese_mooc_scm_fp = open(atomese_mooc_scm, "w")
 
@@ -135,9 +157,6 @@ if not os.path.isfile(atomese_mooc_scm):
       scm(atomese_4)
 
   atomese_mooc_scm_fp.close()
-else:
-  print("--- Loading dataset Atomese from \"{}\"...".format(atomese_mooc_scm))
-  scm("(load-file \"" + atomese_mooc_scm + "\")")
 
 ### Pre-processing ###
 if os.path.isfile(atomese_preprocessed_scm):
@@ -145,6 +164,7 @@ if os.path.isfile(atomese_preprocessed_scm):
   scm("(load-file \"" + atomese_preprocessed_scm + "\")")
 else:
   print("--- Translating EvaluationLinks into SubsetLinks...")
+
   # Minimum translation -- directly turn EvaluationLink relations into SubsetLinks, which generates
   # what's needed for the experiment. The satisfying sets (meta-concepts) will not be generated here.
   # TODO: Turn the below into actual PLN rules
@@ -190,7 +210,9 @@ else:
   # Infer AttractionLinks
   print("--- Inferring AttractionLinks...")
   scm("(pln-load 'empty)")
+  # (Subset A B) |- (Subset (Not A) B)
   scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+  # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
   scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
   scm(" ".join(["(pln-bc",
                   "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
@@ -200,6 +222,12 @@ else:
                       "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
                   "#:maximum-iterations 12",
                   "#:complexity-penalty 10)"]))
+
+  # Write everything generated above
+  scm(" ".join([
+    "(write-atoms-to-file",
+      "\"" + atomese_preprocessed_scm + "\"",
+      "(append (cog-get-atoms 'SubsetLink) (cog-get-atoms 'AttractionLink))"]))
 
 ### DeepWalk ###
 # Generate the sentences for model training
@@ -233,6 +261,7 @@ else:
 
 ### Compare: PLN vs DW ###
 # Get the user pairs
+print("--- Comparing PLN vs DW...")
 users = [x.name for x in get_concepts(user_id_prefix)]
 random.shuffle(users)
 user_pairs = list(zip(users[::2], users[1::2]))
@@ -264,15 +293,9 @@ for pair in user_pairs:
   common_patterns = set(p1_patterns).intersection(p2_patterns)
   common_pattern_size = len(common_patterns)
   # PLN intensional difference
-  intdiff = scm(" ".join([
-    "(define bc",
-      "(gar",
-        "(pln-bc",
-          "(IntensionalDifference",
-            "(Concept \"" + p1 + "\")",
-            "(Concept \"" + p2 + "\")))))"]))
-  tv_mean = float(scm("(cog-mean bc)"))
-  tv_conf = float(scm("(cog-confidence bc)"))
+  intdiff_tv = intensional_difference(p1, p2)
+  tv_mean = intdiff_tv.mean
+  tv_conf = intdiff_tv.conf
   # DeepWalk euclidean distance
   v1 = deepwalk[p1]
   v2 = deepwalk[p2]
