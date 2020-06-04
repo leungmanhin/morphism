@@ -158,7 +158,7 @@ else:
 
   atomese_mooc_scm_fp.close()
 
-### Pre-processing ###
+### Pre-processing for PLN ###
 if os.path.isfile(atomese_preprocessed_scm):
   print("--- Loading PLN-preprocessed Atomese from \"{}\"...".format(atomese_preprocessed_scm))
   scm("(load-file \"" + atomese_preprocessed_scm + "\")")
@@ -237,16 +237,40 @@ if os.path.exists(deepwalk_sentences):
   with open(deepwalk_sentences, "rb") as f:
     sentences = pickle.load(f)
 else:
-  print("--- Generating sentences...")
+  next_word_dict = {}
+
+  def add_to_next_word_dict(w, nw):
+    if next_word_dict.get(w):
+      next_word_dict[w].add(nw)
+    else:
+      next_word_dict[w] = {nw}
+
+  print("--- Gathering next words...")
   evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
   for evalink in evalinks:
     pred = evalink.out[0].name
     rev_pred = get_reverse_pred(pred)
     source = evalink.out[1].out[0].name
     target = evalink.out[1].out[1].name
-    sentences.append([source, pred, target])
-    sentences.append([target, rev_pred, source])
-  print("--- Total number of sentences generated: {}".format(len(sentences)))
+    add_to_next_word_dict(source, pred)
+    add_to_next_word_dict(pred, target)
+    add_to_next_word_dict(target, rev_pred)
+    add_to_next_word_dict(rev_pred, source)
+
+  print("--- Generating sentences...")
+  num_sentences = 10000000
+  sentence_length = 9
+  first_words = [x.name for x in atomspace.get_atoms_by_type(types.ConceptNode)]
+  for i in range(num_sentences):
+    sentence = []
+    for j in range(sentence_length):
+      if j == 0:
+        sentence.append(random.choice(first_words))
+      else:
+        last_word = sentence[-1]
+        next_words = next_word_dict.get(last_word)
+        sentence.append(random.choice(tuple(next_words)))
+    sentences.append(sentence)
   with open(deepwalk_sentences, "wb") as f:
     pickle.dump(sentences, f)
 
