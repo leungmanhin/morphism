@@ -38,21 +38,6 @@ def get_concepts(name_prefix):
              lambda x : x.name.startswith(name_prefix),
              atomspace.get_atoms_by_type(types.ConceptNode)))
 
-def get_subsets(node):
-  return list(
-           filter(
-             lambda x : x.type == types.SubsetLink and x.out[1] == node,
-             node.incoming))
-
-def get_patterns(node):
-  return [x.out[0] for x in get_subsets(node)]
-
-def tv_mean(node, usize):
-  return len(get_patterns(node)) / usize
-
-def tv_confidence(cnt):
-  return float(scm("(count->confidence " + str(cnt) + ")"))
-
 def get_reverse_pred(pred):
   if pred == "takes":
     return "is_taken_by"
@@ -195,8 +180,55 @@ def generate_subsets():
     SubsetLink(source, target)
     SubsetLink(target, source)
 
+def calculate_truth_values():
+  print("--- Calculating Truth Values")
+
+  def get_members(node):
+    memblinks = filter(lambda x : x.type == types.MemberLink and x.out[1] == node, node.incoming)
+    members = [x.out[0] for x in tuple(memblinks)]
+    return members
+
+  def get_confidence(count):
+    return float(scm("(count->confidence " + str(count) + ")"))
+
+  # EvaluationLinks are generated directly from the data, can be considered as true
+  for e in atomspace.get_atoms_by_type(types.EvaluationLink):
+    e.tv = TruthValue(1, 1)
+
+  # MemberLinks are generated directly from the data, can be considered as true
+  for m in atomspace.get_atoms_by_type(types.MemberLink):
+    m.tv = TruthValue(1, 1)
+
+  # SubsetLink (stv s c)
+  #   A
+  #   B
+  # where:
+  # s = |B intersect A| / |A|
+  # c = |A|
+  for s in atomspace.get_atoms_by_type(types.SubsetLink):
+    node1 = s.out[0]
+    node2 = s.out[1]
+    node1_members = get_members(node1)
+    node2_members = get_members(node2)
+    common_members = set(node2_members).intersection(node1_members)
+    tv_strength = len(common_members) / len(node1_members)
+    tv_confidence = get_confidence(len(node1_members))
+    s.tv = TruthValue(tv_strength, tv_confidence)
+
+  # ConceptNode "A" (stv s c)
+  # where:
+  # s = |A| / |universe|
+  # c = |universe|
+  for c in get_concepts(user_id_prefix):
+    member_size = len(get_members(c))
+    universe_size = len(get_concepts(course_id_prefix))
+    tv_strength = member_size / universe_size
+    tv_confidence = get_confidence(universe_size)
+    c.tv = TruthValue(tv_strength, tv_confidence)
+
 populate_atomspace()
 generate_subsets()
+calculate_truth_values()
 
 ''' JJJ
 if os.path.isfile(atomese_mooc_scm):
