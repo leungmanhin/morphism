@@ -17,18 +17,12 @@ deepwalk_sentences = os.getcwd() + "/datasets/deepwalk_sentences.pickle"
 deepwalk_model = os.getcwd() + "/results/deepwalk.bin"
 results_csv = os.getcwd() + "/results/results.csv"
 
+course_id_prefix = "course:"
 user_id_prefix = "user:"
-action_id_prefix = "action:"
 target_id_prefix = "target:"
 feature_prefix = "feature:"
 
-def evalink(pred, node1, node2):
-  return "\n".join(["(EvaluationLink",
-                    "\t(PredicateNode \"" + pred + "\")",
-                    "\t(ListLink",
-                    "\t\t(ConceptNode \"" + node1 + "\")",
-                    "\t\t(ConceptNode \"" + node2 + "\")))\n"])
-
+### Utils ###
 def scm(atomese):
   return scheme_eval(atomspace, atomese).decode("utf-8")
 
@@ -94,12 +88,109 @@ scm(" ".join([
       "atoms)",
     "(close-port fp))"]))
 
-### Load dataset ###
+### Populate the AtomSpace ###
+# Notes for this dataset:
+# - Each action is taken by one and only one user
+#   i.e. it's not very useful, so everything associated with it
+#   will be passed to the user directly
+# - A user will not come back once he/she has dropped-out,
+#   i.e. each user is assumed to have taken only one course
+def populate_atomspace():
+  print("--- Populating the AtomSpace with the dataset")
+
+  if os.path.isfile(atomese_mooc_scm):
+    print("--- Loading dataset Atoms from \"{}\"...".format(atomese_mooc_scm))
+    scm("(load-file \"" + atomese_mooc_scm + "\")")
+  else:
+    action_feature_dict = {}
+    with open(mooc_action_features_tsv) as f:
+      action_features = []
+
+      def process_feature(action_id, feature):
+        if feature not in action_features:
+          action_features.append(feature)
+
+        feature_id = str(action_features.index(feature))
+        feature_name = feature_prefix + feature_id
+
+        if action_feature_dict.get(action_id):
+          action_feature_dict[action_id].add(feature_name)
+        else:
+          action_feature_dict[action_id] = {feature_name}
+
+      next(f)
+      for line in f:
+        content = line.split("\t")
+        action_id = content[0].strip()
+        feature_0 = content[1].strip()
+        feature_1 = content[2].strip()
+        feature_2 = content[3].strip()
+        feature_3 = content[4].strip()
+        process_feature(action_id, feature_0)
+        process_feature(action_id, feature_1)
+        process_feature(action_id, feature_2)
+        process_feature(action_id, feature_3)
+
+    dropout_action_ids = []
+    with open(mooc_action_labels_tsv) as f:
+      next(f)
+      for line in f:
+        content = line.split("\t")
+        action_id = content[0].strip()
+        label = content[1].strip()
+        if label == "1":
+          dropout_action_ids.append(action_id)
+
+    with open(mooc_actions_tsv) as f:
+      def evalink(pred, node1, node2):
+        return "\n".join([
+          "(EvaluationLink (stv 1 1)",
+          "\t(PredicateNode \"" + pred + "\")",
+          "\t(ListLink",
+          "\t\t(ConceptNode \"" + node1 + "\")",
+          "\t\t(ConceptNode \"" + node2 + "\")))\n"])
+
+      def memblink(node1, node2):
+        return "\n".join([
+          "(MemberLink (stv 1 1)",
+          "\t(ConceptNode \"" + node1 + "\")",
+          "\t(ConceptNode \"" + node2 + "\"))\n"])
+
+      next(f)
+      for line in f:
+        content = line.split("\t")
+        action_id = content[0].strip()
+        user_id = content[1].strip()
+        target_id = content[2].strip()
+
+        course_name = course_id_prefix + user_id
+        user_name = user_id_prefix + user_id
+        target_name = target_id_prefix + target_id
+        feature_names = action_feature_dict[action_id]
+
+        scm(memblink(course_name, user_name))
+        scm(memblink(course_name, target_name))
+        scm(evalink("has_action_target", user_name, target_name))
+        for feature_name in feature_names:
+          scm(memblink(course_name, feature_name))
+          scm(evalink("has_action_feature", user_name, feature_name))
+        if action_id in dropout_action_ids:
+          scm(memblink(course_name, "dropout"))
+          scm(evalink("has", user_name, "dropout"))
+
+    scm(" ".join([
+      "(write-atoms-to-file",
+      "\"" + atomese_mooc_scm + "\"",
+      "(append (cog-get-atoms 'MemberLink) (cog-get-atoms 'EvaluationLink)))"]))
+
+populate_atomspace()
+
+''' JJJ
 if os.path.isfile(atomese_mooc_scm):
-  print("--- Loading dataset Atomese from \"{}\"...".format(atomese_mooc_scm))
+  print("--- Loading dataset Atoms from \"{}\"...".format(atomese_mooc_scm))
   scm("(load-file \"" + atomese_mooc_scm + "\")")
 else:
-  print("--- Generating Atomese from dataset...")
+  print("--- Generating Atoms from dataset...")
   atomese_mooc_scm_fp = open(atomese_mooc_scm, "w")
 
   with open(mooc_actions_tsv) as f:
@@ -174,19 +265,19 @@ else:
     SubsetLink(target, source)
 
   # Infer new subsets via transitivity
-  print("--- Inferring new subsets...")
-  scm("(pln-load 'empty)")
-  scm("(pln-load-from-path \"transitivity.scm\")")
-  # (Subset C1 C2) (Subset C2 C3) |- (Subset C1 C3)
-  scm("(pln-add-rule-by-name \"present-subset-transitivity-rule\")")
-  scm(" ".join(["(pln-fc",
-                  "(Subset (Variable \"$X\") (Variable \"$Y\"))",
-                  "#:vardecl",
-                    "(VariableSet",
-                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
-                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
-                  "#:maximum-iterations 10",
-                  "#:fc-full-rule-application #t)"]))
+  # print("--- Inferring new subsets...")
+  # scm("(pln-load 'empty)")
+  # scm("(pln-load-from-path \"transitivity.scm\")")
+  # # (Subset C1 C2) (Subset C2 C3) |- (Subset C1 C3)
+  # scm("(pln-add-rule-by-name \"present-subset-transitivity-rule\")")
+  # scm(" ".join(["(pln-fc",
+  #                 "(Subset (Variable \"$X\") (Variable \"$Y\"))",
+  #                 "#:vardecl",
+  #                   "(VariableSet",
+  #                     "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+  #                     "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+  #                 "#:maximum-iterations 10",
+  #                 "#:fc-full-rule-application #t)"]))
 
   # Calculate & assign TVs
   print("--- Calculating and assigning TVs...")
@@ -256,11 +347,13 @@ else:
     add_to_next_word_dict(pred, target)
     add_to_next_word_dict(target, rev_pred)
     add_to_next_word_dict(rev_pred, source)
+  for k, v in next_word_dict.items():
+    next_word_dict[k] = tuple(v)
 
   print("--- Generating sentences...")
-  num_sentences = 10000000
+  num_sentences = 100000000
   sentence_length = 9
-  first_words = [x.name for x in atomspace.get_atoms_by_type(types.ConceptNode)]
+  first_words = [x.name for x in get_concepts(user_id_prefix)]
   for i in range(num_sentences):
     sentence = []
     for j in range(sentence_length):
@@ -269,8 +362,10 @@ else:
       else:
         last_word = sentence[-1]
         next_words = next_word_dict.get(last_word)
-        sentence.append(random.choice(tuple(next_words)))
+        sentence.append(random.choice(next_words))
     sentences.append(sentence)
+    if len(sentences) % 10000 == 0:
+      print(len(sentences))
   with open(deepwalk_sentences, "wb") as f:
     pickle.dump(sentences, f)
 
@@ -282,6 +377,9 @@ else:
   print("--- Training model...")
   deepwalk = Word2Vec(sentences, min_count=1)
   deepwalk.save(deepwalk_model)
+
+# JJJ
+print(deepwalk.most_similar(positive=["action:1", "action:2"], negative=["action:3"]))
 
 ### Compare: PLN vs DW ###
 # Get the user pairs
@@ -334,3 +432,4 @@ for pair in user_pairs:
     str(vec_dist)])
   results_csv_fp.write(row + "\n")
 results_csv_fp.close()
+'''
