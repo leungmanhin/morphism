@@ -187,7 +187,16 @@ def populate_atomspace():
       atomese_mooc_scm,
       "(append (cog-get-atoms 'MemberLink) (cog-get-atoms 'EvaluationLink))")
 
+def generate_subsets():
+  print("--- Generating SubsetLinks")
+  for evalink in atomspace.get_atoms_by_type(types.EvaluationLink):
+    source = evalink.out[1].out[0]
+    target = evalink.out[1].out[1]
+    SubsetLink(source, target)
+    SubsetLink(target, source)
+
 populate_atomspace()
+generate_subsets()
 
 ''' JJJ
 if os.path.isfile(atomese_mooc_scm):
