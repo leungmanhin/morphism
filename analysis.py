@@ -26,6 +26,12 @@ feature_prefix = "feature:"
 def scm(atomese):
   return scheme_eval(atomspace, atomese).decode("utf-8")
 
+def write_atoms_to_file(filename, atom_list_str):
+  scm(" ".join([
+    "(write-atoms-to-file",
+    "\"" + filename + "\"",
+    atom_list_str + ")"]))
+
 def get_concepts(name_prefix):
   return list(
            filter(
@@ -78,7 +84,7 @@ initialize_opencog(atomspace)
 ### Guile setup ###
 scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
 scm("(add-to-load-path \".\")")
-scm("(use-modules (opencog) (opencog bioscience) (opencog pln) (opencog persist-file))")
+scm("(use-modules (opencog) (opencog bioscience) (opencog ure) (opencog pln) (opencog persist-file))")
 scm("(load \"utils.scm\")")
 scm(" ".join([
   "(define (write-atoms-to-file file atoms)",
@@ -96,12 +102,11 @@ scm(" ".join([
 # - A user will not come back once he/she has dropped-out,
 #   i.e. each user is assumed to have taken only one course
 def populate_atomspace():
-  print("--- Populating the AtomSpace with the dataset")
-
   if os.path.isfile(atomese_mooc_scm):
-    print("--- Loading dataset Atoms from \"{}\"...".format(atomese_mooc_scm))
+    print("--- Populating the AtomSpace by loading \"{}\"...".format(atomese_mooc_scm))
     scm("(load-file \"" + atomese_mooc_scm + "\")")
   else:
+    print("--- Populating the AtomSpace")
     action_feature_dict = {}
     with open(mooc_action_features_tsv) as f:
       action_features = []
@@ -144,7 +149,7 @@ def populate_atomspace():
     with open(mooc_actions_tsv) as f:
       def evalink(pred, node1, node2):
         return "\n".join([
-          "(EvaluationLink (stv 1 1)",
+          "(EvaluationLink",
           "\t(PredicateNode \"" + pred + "\")",
           "\t(ListLink",
           "\t\t(ConceptNode \"" + node1 + "\")",
@@ -152,7 +157,7 @@ def populate_atomspace():
 
       def memblink(node1, node2):
         return "\n".join([
-          "(MemberLink (stv 1 1)",
+          "(MemberLink",
           "\t(ConceptNode \"" + node1 + "\")",
           "\t(ConceptNode \"" + node2 + "\"))\n"])
 
@@ -178,10 +183,9 @@ def populate_atomspace():
           scm(memblink(course_name, "dropout"))
           scm(evalink("has", user_name, "dropout"))
 
-    scm(" ".join([
-      "(write-atoms-to-file",
-      "\"" + atomese_mooc_scm + "\"",
-      "(append (cog-get-atoms 'MemberLink) (cog-get-atoms 'EvaluationLink)))"]))
+    write_atoms_to_file(
+      atomese_mooc_scm,
+      "(append (cog-get-atoms 'MemberLink) (cog-get-atoms 'EvaluationLink))")
 
 populate_atomspace()
 
