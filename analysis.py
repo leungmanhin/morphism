@@ -226,9 +226,26 @@ def calculate_truth_values():
     tv_confidence = get_confidence(universe_size)
     c.tv = TruthValue(tv_strength, tv_confidence)
 
+def infer_attraction_links():
+  print("--- Inferring AttractionLinks...")
+  scm("(pln-load 'empty)")
+  # (Subset A B) |- (Subset (Not A) B)
+  scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+  # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
+  scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
+  scm(" ".join(["(pln-bc",
+                  "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
+                  "#:vardecl",
+                    "(VariableSet",
+                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                  "#:maximum-iterations 12",
+                  "#:complexity-penalty 10)"]))
+
 populate_atomspace()
 generate_subsets()
 calculate_truth_values()
+infer_attraction_links()
 
 ''' JJJ
 if os.path.isfile(atomese_mooc_scm):
