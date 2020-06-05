@@ -11,8 +11,6 @@ from scipy.spatial import distance
 mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
 mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
 mooc_action_features_tsv = os.getcwd() + "/datasets/mooc_action_features.tsv"
-atomese_mooc_scm = os.getcwd() + "/datasets/atomese-mooc.scm"
-atomese_preprocessed_scm = os.getcwd() + "/results/atomese-preprocessed.scm"
 deepwalk_sentences = os.getcwd() + "/datasets/deepwalk_sentences.pickle"
 deepwalk_model = os.getcwd() + "/results/deepwalk.bin"
 results_csv = os.getcwd() + "/results/results.csv"
@@ -87,90 +85,82 @@ scm(" ".join([
 # - A user will not come back once he/she has dropped-out,
 #   i.e. each user is assumed to have taken only one course
 def populate_atomspace():
-  if os.path.isfile(atomese_mooc_scm):
-    print("--- Populating the AtomSpace by loading \"{}\"...".format(atomese_mooc_scm))
-    scm("(load-file \"" + atomese_mooc_scm + "\")")
-  else:
-    print("--- Populating the AtomSpace")
-    action_feature_dict = {}
-    with open(mooc_action_features_tsv) as f:
-      action_features = []
+  print("--- Populating the AtomSpace")
+  action_feature_dict = {}
+  with open(mooc_action_features_tsv) as f:
+    action_features = []
 
-      def process_feature(action_id, feature):
-        if feature not in action_features:
-          action_features.append(feature)
+    def process_feature(action_id, feature):
+      if feature not in action_features:
+        action_features.append(feature)
 
-        feature_id = str(action_features.index(feature))
-        feature_name = feature_prefix + feature_id
+      feature_id = str(action_features.index(feature))
+      feature_name = feature_prefix + feature_id
 
-        if action_feature_dict.get(action_id):
-          action_feature_dict[action_id].add(feature_name)
-        else:
-          action_feature_dict[action_id] = {feature_name}
+      if action_feature_dict.get(action_id):
+        action_feature_dict[action_id].add(feature_name)
+      else:
+        action_feature_dict[action_id] = {feature_name}
 
-      next(f)
-      for line in f:
-        content = line.split("\t")
-        action_id = content[0].strip()
-        feature_0 = content[1].strip()
-        feature_1 = content[2].strip()
-        feature_2 = content[3].strip()
-        feature_3 = content[4].strip()
-        process_feature(action_id, feature_0)
-        process_feature(action_id, feature_1)
-        process_feature(action_id, feature_2)
-        process_feature(action_id, feature_3)
+    next(f)
+    for line in f:
+      content = line.split("\t")
+      action_id = content[0].strip()
+      feature_0 = content[1].strip()
+      feature_1 = content[2].strip()
+      feature_2 = content[3].strip()
+      feature_3 = content[4].strip()
+      process_feature(action_id, feature_0)
+      process_feature(action_id, feature_1)
+      process_feature(action_id, feature_2)
+      process_feature(action_id, feature_3)
 
-    dropout_action_ids = []
-    with open(mooc_action_labels_tsv) as f:
-      next(f)
-      for line in f:
-        content = line.split("\t")
-        action_id = content[0].strip()
-        label = content[1].strip()
-        if label == "1":
-          dropout_action_ids.append(action_id)
+  dropout_action_ids = []
+  with open(mooc_action_labels_tsv) as f:
+    next(f)
+    for line in f:
+      content = line.split("\t")
+      action_id = content[0].strip()
+      label = content[1].strip()
+      if label == "1":
+        dropout_action_ids.append(action_id)
 
-    with open(mooc_actions_tsv) as f:
-      def evalink(pred, node1, node2):
-        return "\n".join([
-          "(EvaluationLink",
-          "\t(PredicateNode \"" + pred + "\")",
-          "\t(ListLink",
-          "\t\t(ConceptNode \"" + node1 + "\")",
-          "\t\t(ConceptNode \"" + node2 + "\")))\n"])
+  with open(mooc_actions_tsv) as f:
+    def evalink(pred, node1, node2):
+      return "\n".join([
+        "(EvaluationLink",
+        "\t(PredicateNode \"" + pred + "\")",
+        "\t(ListLink",
+        "\t\t(ConceptNode \"" + node1 + "\")",
+        "\t\t(ConceptNode \"" + node2 + "\")))\n"])
 
-      def memblink(node1, node2):
-        return "\n".join([
-          "(MemberLink",
-          "\t(ConceptNode \"" + node1 + "\")",
-          "\t(ConceptNode \"" + node2 + "\"))\n"])
+    def memblink(node1, node2):
+      return "\n".join([
+        "(MemberLink",
+        "\t(ConceptNode \"" + node1 + "\")",
+        "\t(ConceptNode \"" + node2 + "\"))\n"])
 
-      next(f)
-      for line in f:
-        content = line.split("\t")
-        action_id = content[0].strip()
-        user_id = content[1].strip()
-        target_id = content[2].strip()
+    next(f)
+    for line in f:
+      content = line.split("\t")
+      action_id = content[0].strip()
+      user_id = content[1].strip()
+      target_id = content[2].strip()
 
-        course_name = course_id_prefix + user_id
-        user_name = user_id_prefix + user_id
-        target_name = target_id_prefix + target_id
-        feature_names = action_feature_dict[action_id]
+      course_name = course_id_prefix + user_id
+      user_name = user_id_prefix + user_id
+      target_name = target_id_prefix + target_id
+      feature_names = action_feature_dict[action_id]
 
-        scm(memblink(course_name, user_name))
-        scm(memblink(course_name, target_name))
-        scm(evalink("has_action_target", user_name, target_name))
-        for feature_name in feature_names:
-          scm(memblink(course_name, feature_name))
-          scm(evalink("has_action_feature", user_name, feature_name))
-        if action_id in dropout_action_ids:
-          scm(memblink(course_name, "dropout"))
-          scm(evalink("has", user_name, "dropout"))
-
-    write_atoms_to_file(
-      atomese_mooc_scm,
-      "(append (cog-get-atoms 'MemberLink) (cog-get-atoms 'EvaluationLink))")
+      scm(memblink(course_name, user_name))
+      scm(memblink(course_name, target_name))
+      scm(evalink("has_action_target", user_name, target_name))
+      for feature_name in feature_names:
+        scm(memblink(course_name, feature_name))
+        scm(evalink("has_action_feature", user_name, feature_name))
+      if action_id in dropout_action_ids:
+        scm(memblink(course_name, "dropout"))
+        scm(evalink("has", user_name, "dropout"))
 
 def generate_subsets():
   print("--- Generating SubsetLinks")
@@ -226,8 +216,12 @@ def calculate_truth_values():
     tv_confidence = get_confidence(universe_size)
     c.tv = TruthValue(tv_strength, tv_confidence)
 
+  write_atoms_to_file("member-links.scm", "(cog-get-atoms 'MemberLink)")
+  write_atoms_to_file("evaluation-links.scm", "(cog-get-atoms 'EvaluationLink)")
+  write_atoms_to_file("subset-links.scm", "(cog-get-atoms 'SubsetLink)")
+
 def infer_attraction_links():
-  print("--- Inferring AttractionLinks...")
+  print("--- Inferring AttractionLinks")
   scm("(pln-load 'empty)")
   # (Subset A B) |- (Subset (Not A) B)
   scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
@@ -241,6 +235,8 @@ def infer_attraction_links():
                       "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
                   "#:maximum-iterations 12",
                   "#:complexity-penalty 10)"]))
+
+  write_atoms_to_file("attraction-links.scm", "(cog-get-atoms 'AttractionLink)")
 
 populate_atomspace()
 generate_subsets()
