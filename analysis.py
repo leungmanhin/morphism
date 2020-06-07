@@ -198,6 +198,17 @@ def calculate_truth_values():
   for m in atomspace.get_atoms_by_type(types.MemberLink):
     m.tv = TruthValue(1, 1)
 
+  # ConceptNode "A" (stv s c)
+  # where:
+  # s = |A| / |universe|
+  # c = |universe|
+  universe_size = len(get_concepts(course_id_prefix))
+  tv_confidence = get_confidence(universe_size)
+  for c in atomspace.get_atoms_by_type(types.ConceptNode):
+    member_size = len(get_members(c))
+    tv_strength = member_size / universe_size
+    c.tv = TruthValue(tv_strength, tv_confidence)
+
   # SubsetLink (stv s c)
   #   A
   #   B
@@ -213,17 +224,6 @@ def calculate_truth_values():
     tv_strength = len(common_members) / len(node1_members)
     tv_confidence = get_confidence(len(node1_members))
     s.tv = TruthValue(tv_strength, tv_confidence)
-
-  # ConceptNode "A" (stv s c)
-  # where:
-  # s = |A| / |universe|
-  # c = |universe|
-  universe_size = len(get_concepts(course_id_prefix))
-  tv_confidence = get_confidence(universe_size)
-  for c in get_concepts(user_id_prefix):
-    member_size = len(get_members(c))
-    tv_strength = member_size / universe_size
-    c.tv = TruthValue(tv_strength, tv_confidence)
 
 def infer_attractions():
   print("--- Inferring AttractionLinks")
