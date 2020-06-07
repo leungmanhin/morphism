@@ -312,16 +312,15 @@ def train_deepwalk_model():
     deepwalk = Word2Vec(sentences, min_count=1)
     deepwalk.save(deepwalk_bin)
 
-def compare()
+def compare():
   print("--- Comparing PLN vs DW...")
 
   def get_patterns(node):
     def get_subsets(node):
-      return
-        list(
-          filter(
-            lambda x : x.type == types.SubsetLink and x.out[0] == node,
-            node.incoming))
+      return list(
+               filter(
+                 lambda x : x.type == types.SubsetLink and x.out[0] == node,
+                 node.incoming))
     return [x.out[1] for x in get_subsets(node)]
 
   # Get the user pairs
