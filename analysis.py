@@ -313,6 +313,69 @@ def train_deepwalk_model():
     deepwalk = Word2Vec(sentences, min_count=1)
     deepwalk.save(deepwalk_bin)
 
+def compare()
+  print("--- Comparing PLN vs DW...")
+
+  def get_patterns(node):
+    def get_subsets(node):
+      return
+        list(
+          filter(
+            lambda x : x.type == types.SubsetLink and x.out[0] == node,
+            node.incoming))
+    return [x.out[1] for x in get_subsets(node)]
+
+  # Get the user pairs
+  print("--- Generating user pairs")
+  users = [x.name for x in get_concepts(user_id_prefix)]
+  random.shuffle(users)
+  user_pairs = list(zip(users[::2], users[1::2]))
+
+  # PLN setup
+  scm("(pln-load 'empty)")
+  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule\")")
+
+  # Output file
+  results_csv_fp = open(results_csv, "w")
+  first_row = ",".join([
+    "Pair",
+    "P1 patterns",
+    "P2 patterns",
+    "Common patterns",
+    "IntDiff strength",
+    "IntDiff confidence",
+    "Vector distance"])
+  results_csv_fp.write(first_row + "\n")
+
+  # Generate the results
+  for pair in user_pairs:
+    p1 = pair[0]
+    p2 = pair[1]
+    p1_patterns = get_patterns(ConceptNode(p1))
+    p2_patterns = get_patterns(ConceptNode(p2))
+    p1_pattern_size = len(p1_patterns)
+    p2_pattern_size = len(p2_patterns)
+    common_patterns = set(p1_patterns).intersection(p2_patterns)
+    common_pattern_size = len(common_patterns)
+    # PLN intensional difference
+    intdiff_tv = intensional_difference(p1, p2)
+    tv_mean = intdiff_tv.mean
+    tv_conf = intdiff_tv.conf
+    # DeepWalk euclidean distance
+    v1 = deepwalk[p1]
+    v2 = deepwalk[p2]
+    vec_dist = distance.euclidean(v1, v2)
+    row = ",".join([
+      p1 + " " + p2,
+      str(p1_pattern_size),
+      str(p2_pattern_size),
+      str(common_pattern_size),
+      str(tv_mean),
+      str(tv_conf),
+      str(vec_dist)])
+    results_csv_fp.write(row + "\n")
+  results_csv_fp.close()
+
 ### Main ###
 # load_all_atomes()
 populate_atomspace()
@@ -320,6 +383,7 @@ generate_subsets()
 calculate_truth_values()
 infer_attractions()
 train_deepwalk_model()
+compare()
 # export_all_atoms()
 
 ''' JJJ
@@ -519,54 +583,4 @@ else:
 print(deepwalk.most_similar(positive=["action:1", "action:2"], negative=["action:3"]))
 
 ### Compare: PLN vs DW ###
-# Get the user pairs
-print("--- Comparing PLN vs DW...")
-users = [x.name for x in get_concepts(user_id_prefix)]
-random.shuffle(users)
-user_pairs = list(zip(users[::2], users[1::2]))
-
-# PLN setup
-scm("(pln-load 'empty)")
-scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule\")")
-
-# Output file
-results_csv_fp = open(results_csv, "w")
-first_row = ",".join([
-  "Pair",
-  "P1 patterns",
-  "P2 patterns",
-  "Common patterns",
-  "IntDiff strength",
-  "IntDiff confidence",
-  "Vector distance"])
-results_csv_fp.write(first_row + "\n")
-
-# Generate the results
-for pair in user_pairs:
-  p1 = pair[0]
-  p2 = pair[1]
-  p1_patterns = get_patterns(ConceptNode(p1))
-  p2_patterns = get_patterns(ConceptNode(p2))
-  p1_pattern_size = len(p1_patterns)
-  p2_pattern_size = len(p2_patterns)
-  common_patterns = set(p1_patterns).intersection(p2_patterns)
-  common_pattern_size = len(common_patterns)
-  # PLN intensional difference
-  intdiff_tv = intensional_difference(p1, p2)
-  tv_mean = intdiff_tv.mean
-  tv_conf = intdiff_tv.conf
-  # DeepWalk euclidean distance
-  v1 = deepwalk[p1]
-  v2 = deepwalk[p2]
-  vec_dist = distance.euclidean(v1, v2)
-  row = ",".join([
-    p1 + " " + p2,
-    str(p1_pattern_size),
-    str(p2_pattern_size),
-    str(common_pattern_size),
-    str(tv_mean),
-    str(tv_conf),
-    str(vec_dist)])
-  results_csv_fp.write(row + "\n")
-results_csv_fp.close()
 '''
