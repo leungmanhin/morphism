@@ -315,13 +315,19 @@ def train_deepwalk_model():
 def compare():
   print("--- Comparing PLN vs DW...")
 
+  node_pattern_dict = {}
   def get_patterns(node):
     def get_subsets(node):
       return list(
                filter(
                  lambda x : x.type == types.SubsetLink and x.out[0] == node,
                  node.incoming))
-    return [x.out[1] for x in get_subsets(node)]
+    if node_pattern_dict.get(node):
+      return node_pattern_dict[node]
+    else:
+      pats = [x.out[1] for x in get_subsets(node)]
+      node_pattern_dict[node] = pats
+    return pats
 
   # Get the user pairs
   print("--- Generating user pairs")
