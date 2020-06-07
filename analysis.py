@@ -37,14 +37,12 @@ def get_concepts(name_prefix):
              atomspace.get_atoms_by_type(types.ConceptNode)))
 
 def get_reverse_pred(pred):
-  if pred == "takes":
-    return "is_taken_by"
-  elif pred == "has_target":
-    return "is_a_target_of"
-  elif pred == "has_feature":
-    return "is_a_feature_of"
-  elif pred == "leads_to":
-    return "is_led_by"
+  if pred == "has_action_target":
+    return "is_an_action_target_of"
+  elif pred == "has_action_feature":
+    return "is_an_action_feature_of"
+  elif pred == "has":
+    return "was_the_result_of"
   else:
     raise Exception("The reverse of predicate \"{}\" is not defined!".format(pred))
 
@@ -159,8 +157,8 @@ def populate_atomspace():
         scm(memblink(course_name, feature_name))
         scm(evalink("has_action_feature", user_name, feature_name))
       if action_id in dropout_action_ids:
-        scm(memblink(course_name, "dropout"))
-        scm(evalink("has", user_name, "dropout"))
+        scm(memblink(course_name, "dropped-out"))
+        scm(evalink("has", user_name, "dropped-out"))
 
 def generate_subsets():
   print("--- Generating SubsetLinks")
@@ -209,18 +207,18 @@ def calculate_truth_values():
   # where:
   # s = |A| / |universe|
   # c = |universe|
+  universe_size = len(get_concepts(course_id_prefix))
+  tv_confidence = get_confidence(universe_size)
   for c in get_concepts(user_id_prefix):
     member_size = len(get_members(c))
-    universe_size = len(get_concepts(course_id_prefix))
     tv_strength = member_size / universe_size
-    tv_confidence = get_confidence(universe_size)
     c.tv = TruthValue(tv_strength, tv_confidence)
 
   write_atoms_to_file("member-links.scm", "(cog-get-atoms 'MemberLink)")
   write_atoms_to_file("evaluation-links.scm", "(cog-get-atoms 'EvaluationLink)")
   write_atoms_to_file("subset-links.scm", "(cog-get-atoms 'SubsetLink)")
 
-def infer_attraction_links():
+def infer_attractions():
   print("--- Inferring AttractionLinks")
   scm("(pln-load 'empty)")
   # (Subset A B) |- (Subset (Not A) B)
@@ -238,10 +236,70 @@ def infer_attraction_links():
 
   write_atoms_to_file("attraction-links.scm", "(cog-get-atoms 'AttractionLink)")
 
+def generate_sentences():
+  if os.path.exists(deepwalk_sentences):
+    print("--- Loading generated sentences from \"{}\"...".format(deepwalk_sentences))
+    with open(deepwalk_sentences, "rb") as f:
+      sentences = pickle.load(f)
+  else:
+    next_word_dict = {}
+    sentences = []
+
+    def add_to_next_word_dict(w, nw):
+      if next_word_dict.get(w):
+        next_word_dict[w].add(nw)
+      else:
+        next_word_dict[w] = {nw}
+
+    print("--- Gathering next words...")
+    evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
+    for evalink in evalinks:
+      pred = evalink.out[0].name
+      rev_pred = get_reverse_pred(pred)
+      source = evalink.out[1].out[0].name
+      target = evalink.out[1].out[1].name
+      add_to_next_word_dict(source, pred)
+      add_to_next_word_dict(pred, target)
+      add_to_next_word_dict(target, rev_pred)
+      add_to_next_word_dict(rev_pred, source)
+    for k, v in next_word_dict.items():
+      next_word_dict[k] = tuple(v)
+
+    print("--- Generating sentences...")
+    num_sentences = 10000000
+    sentence_length = 15
+    first_words = [x.name for x in get_concepts(user_id_prefix)]
+    for i in range(num_sentences):
+      sentence = []
+      for j in range(sentence_length):
+        if j == 0:
+          sentence.append(random.choice(first_words))
+        else:
+          last_word = sentence[-1]
+          next_words = next_word_dict.get(last_word)
+          sentence.append(random.choice(next_words))
+      sentences.append(sentence)
+      if len(sentences) % 10000 == 0:
+        print(len(sentences))
+    with open(deepwalk_sentences, "wb") as f:
+      pickle.dump(sentences, f)
+
+def train_deepwalk_model():
+  if os.path.exists(deepwalk_model):
+    print("--- Loading an existing model from \"{}\"...".format(deepwalk_model))
+    deepwalk = Word2Vec.load(deepwalk_model)
+  else:
+    print("--- Training model...")
+    deepwalk = Word2Vec(sentences, min_count=1)
+    deepwalk.save(deepwalk_model)
+
+### Main ###
 populate_atomspace()
 generate_subsets()
 calculate_truth_values()
-infer_attraction_links()
+infer_attractions()
+generate_sentences()
+train_deepwalk_model()
 
 ''' JJJ
 if os.path.isfile(atomese_mooc_scm):
