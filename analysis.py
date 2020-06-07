@@ -11,8 +11,12 @@ from scipy.spatial import distance
 mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
 mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
 mooc_action_features_tsv = os.getcwd() + "/datasets/mooc_action_features.tsv"
-deepwalk_sentences = os.getcwd() + "/datasets/deepwalk_sentences.pickle"
-deepwalk_model = os.getcwd() + "/results/deepwalk.bin"
+member_links_scm = os.getcwd() + "/results/member-links.scm"
+evaluation_links_scm = os.getcwd() + "/results/evaluation-links.scm"
+subset_links_scm = os.getcwd() + "/results/subset-links.scm"
+attraction_links_scm = os.getcwd() + "/results/attraction-links.scm"
+sentences_pickle = os.getcwd() + "/results/sentences.pickle"
+deepwalk_bin = os.getcwd() + "/results/deepwalk.bin"
 results_csv = os.getcwd() + "/results/results.csv"
 
 course_id_prefix = "course:"
@@ -20,31 +24,17 @@ user_id_prefix = "user:"
 target_id_prefix = "target:"
 feature_prefix = "feature:"
 
+deepwalk = None
+
 ### Utils ###
 def scm(atomese):
   return scheme_eval(atomspace, atomese).decode("utf-8")
-
-def write_atoms_to_file(filename, atom_list_str):
-  scm(" ".join([
-    "(write-atoms-to-file",
-    "\"" + filename + "\"",
-    atom_list_str + ")"]))
 
 def get_concepts(name_prefix):
   return list(
            filter(
              lambda x : x.name.startswith(name_prefix),
              atomspace.get_atoms_by_type(types.ConceptNode)))
-
-def get_reverse_pred(pred):
-  if pred == "has_action_target":
-    return "is_an_action_target_of"
-  elif pred == "has_action_feature":
-    return "is_an_action_feature_of"
-  elif pred == "has":
-    return "was_the_result_of"
-  else:
-    raise Exception("The reverse of predicate \"{}\" is not defined!".format(pred))
 
 def intensional_difference(c1, c2):
   intdiff = scm(" ".join([
@@ -65,7 +55,7 @@ initialize_opencog(atomspace)
 ### Guile setup ###
 scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
 scm("(add-to-load-path \".\")")
-scm("(use-modules (opencog) (opencog bioscience) (opencog ure) (opencog pln) (opencog persist-file))")
+scm("(use-modules (opencog) (opencog bioscience) (opencog ure) (opencog pln))")
 scm("(load \"utils.scm\")")
 scm(" ".join([
   "(define (write-atoms-to-file file atoms)",
@@ -74,6 +64,27 @@ scm(" ".join([
       "(lambda (x) (display x fp))",
       "atoms)",
     "(close-port fp))"]))
+
+def load_all_atomes():
+  print("--- Loading Atoms from files")
+  scm("(use-modules (opencog persist-file))")
+  scm("(load-file \"" + member_links_scm + "\")")
+  scm("(load-file \"" + evaluation_links_scm + "\")")
+  scm("(load-file \"" + subset_links_scm + "\")")
+  scm("(load-file \"" + attraction_links_scm + "\")")
+
+def export_all_atoms():
+  def write_atoms_to_file(filename, atom_list_str):
+    scm(" ".join([
+      "(write-atoms-to-file",
+      "\"" + filename + "\"",
+      atom_list_str + ")"]))
+
+  print("--- Exporting Atoms to files")
+  write_atoms_to_file("member-links.scm", "(cog-get-atoms 'MemberLink)")
+  write_atoms_to_file("evaluation-links.scm", "(cog-get-atoms 'EvaluationLink)")
+  write_atoms_to_file("subset-links.scm", "(cog-get-atoms 'SubsetLink)")
+  write_atoms_to_file("attraction-links.scm", "(cog-get-atoms 'AttractionLink)")
 
 ### Populate the AtomSpace ###
 # Notes for this dataset:
@@ -214,10 +225,6 @@ def calculate_truth_values():
     tv_strength = member_size / universe_size
     c.tv = TruthValue(tv_strength, tv_confidence)
 
-  write_atoms_to_file("member-links.scm", "(cog-get-atoms 'MemberLink)")
-  write_atoms_to_file("evaluation-links.scm", "(cog-get-atoms 'EvaluationLink)")
-  write_atoms_to_file("subset-links.scm", "(cog-get-atoms 'SubsetLink)")
-
 def infer_attractions():
   print("--- Inferring AttractionLinks")
   scm("(pln-load 'empty)")
@@ -234,16 +241,25 @@ def infer_attractions():
                   "#:maximum-iterations 12",
                   "#:complexity-penalty 10)"]))
 
-  write_atoms_to_file("attraction-links.scm", "(cog-get-atoms 'AttractionLink)")
+def train_deepwalk_model():
+  sentences = []
 
-def generate_sentences():
-  if os.path.exists(deepwalk_sentences):
-    print("--- Loading generated sentences from \"{}\"...".format(deepwalk_sentences))
-    with open(deepwalk_sentences, "rb") as f:
+  def get_reverse_pred(pred):
+    if pred == "has_action_target":
+      return "is_an_action_target_of"
+    elif pred == "has_action_feature":
+      return "is_an_action_feature_of"
+    elif pred == "has":
+      return "was_the_result_of"
+    else:
+      raise Exception("The reverse of predicate \"{}\" is not defined!".format(pred))
+
+  if os.path.exists(sentences_pickle):
+    print("--- Loading generated sentences from \"{}\"...".format(sentences_pickle))
+    with open(sentences_pickle, "rb") as f:
       sentences = pickle.load(f)
   else:
     next_word_dict = {}
-    sentences = []
 
     def add_to_next_word_dict(w, nw):
       if next_word_dict.get(w):
@@ -281,25 +297,25 @@ def generate_sentences():
       sentences.append(sentence)
       if len(sentences) % 10000 == 0:
         print(len(sentences))
-    with open(deepwalk_sentences, "wb") as f:
+    with open(sentences_pickle, "wb") as f:
       pickle.dump(sentences, f)
 
-def train_deepwalk_model():
-  if os.path.exists(deepwalk_model):
-    print("--- Loading an existing model from \"{}\"...".format(deepwalk_model))
-    deepwalk = Word2Vec.load(deepwalk_model)
+  if os.path.exists(deepwalk_bin):
+    print("--- Loading an existing model from \"{}\"...".format(deepwalk_bin))
+    deepwalk = Word2Vec.load(deepwalk_bin)
   else:
     print("--- Training model...")
     deepwalk = Word2Vec(sentences, min_count=1)
-    deepwalk.save(deepwalk_model)
+    deepwalk.save(deepwalk_bin)
 
 ### Main ###
+# load_all_atomes()
 populate_atomspace()
 generate_subsets()
 calculate_truth_values()
 infer_attractions()
-generate_sentences()
 train_deepwalk_model()
+# export_all_atoms()
 
 ''' JJJ
 if os.path.isfile(atomese_mooc_scm):
