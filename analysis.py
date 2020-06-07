@@ -182,10 +182,15 @@ def generate_subsets():
 def calculate_truth_values():
   print("--- Calculating Truth Values")
 
+  node_member_dict = {}
   def get_members(node):
-    memblinks = filter(lambda x : x.type == types.MemberLink and x.out[1] == node, node.incoming)
-    members = [x.out[0] for x in tuple(memblinks)]
-    return members
+    if node_member_dict.get(node):
+      return node_member_dict[node]
+    else:
+      memblinks = filter(lambda x : x.type == types.MemberLink and x.out[1] == node, node.incoming)
+      members = [x.out[0] for x in tuple(memblinks)]
+      node_member_dict[node] = members
+      return members
 
   def get_confidence(count):
     return float(scm("(count->confidence " + str(count) + ")"))
