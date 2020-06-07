@@ -80,10 +80,10 @@ def export_all_atoms():
       atom_list_str + ")"]))
 
   print("--- Exporting Atoms to files")
-  write_atoms_to_file("member-links.scm", "(cog-get-atoms 'MemberLink)")
-  write_atoms_to_file("evaluation-links.scm", "(cog-get-atoms 'EvaluationLink)")
-  write_atoms_to_file("subset-links.scm", "(cog-get-atoms 'SubsetLink)")
-  write_atoms_to_file("attraction-links.scm", "(cog-get-atoms 'AttractionLink)")
+  write_atoms_to_file(member_links_scm, "(cog-get-atoms 'MemberLink)")
+  write_atoms_to_file(evaluation_links_scm, "(cog-get-atoms 'EvaluationLink)")
+  write_atoms_to_file(subset_links_scm, "(cog-get-atoms 'SubsetLink)")
+  write_atoms_to_file(attraction_links_scm, "(cog-get-atoms 'AttractionLink)")
 
 ### Populate the AtomSpace ###
 # Notes for this dataset:
