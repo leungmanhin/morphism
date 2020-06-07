@@ -85,6 +85,15 @@ def export_all_atoms():
   write_atoms_to_file(subset_links_scm, "(cog-get-atoms 'SubsetLink)")
   write_atoms_to_file(attraction_links_scm, "(cog-get-atoms 'AttractionLink)")
 
+def load_deepwalk_model():
+  global deepwalk
+  print("--- Loading an existing model from \"{}\"".format(deepwalk_bin))
+  deepwalk = Word2Vec.load(deepwalk_bin)
+
+def export_deepwalk_model():
+  global deepwalk
+  deepwalk.save(deepwalk_bin)
+
 ### Populate the AtomSpace ###
 # Notes for this dataset:
 # - Each action is taken by one and only one user
@@ -246,6 +255,7 @@ def infer_attractions():
                   "#:complexity-penalty 10)"]))
 
 def train_deepwalk_model():
+  global deepwalk
   sentences = []
 
   def get_reverse_pred(pred):
@@ -259,7 +269,7 @@ def train_deepwalk_model():
       raise Exception("The reverse of predicate \"{}\" is not defined!".format(pred))
 
   if os.path.exists(sentences_pickle):
-    print("--- Loading generated sentences from \"{}\"...".format(sentences_pickle))
+    print("--- Loading generated sentences from \"{}\"".format(sentences_pickle))
     with open(sentences_pickle, "rb") as f:
       sentences = pickle.load(f)
   else:
@@ -271,7 +281,7 @@ def train_deepwalk_model():
       else:
         next_word_dict[w] = {nw}
 
-    print("--- Gathering next words...")
+    print("--- Gathering next words")
     evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
     for evalink in evalinks:
       pred = evalink.out[0].name
@@ -285,7 +295,7 @@ def train_deepwalk_model():
     for k, v in next_word_dict.items():
       next_word_dict[k] = tuple(v)
 
-    print("--- Generating sentences...")
+    print("--- Generating sentences")
     num_sentences = 10000000
     sentence_length = 15
     first_words = [x.name for x in get_concepts(user_id_prefix)]
@@ -304,16 +314,11 @@ def train_deepwalk_model():
     with open(sentences_pickle, "wb") as f:
       pickle.dump(sentences, f)
 
-  if os.path.exists(deepwalk_bin):
-    print("--- Loading an existing model from \"{}\"...".format(deepwalk_bin))
-    deepwalk = Word2Vec.load(deepwalk_bin)
-  else:
-    print("--- Training model...")
+    print("--- Training model")
     deepwalk = Word2Vec(sentences, min_count=1)
-    deepwalk.save(deepwalk_bin)
 
 def compare():
-  print("--- Comparing PLN vs DW...")
+  print("--- Comparing PLN vs DW")
 
   node_pattern_dict = {}
   def get_patterns(node):
@@ -351,6 +356,7 @@ def compare():
     "Vector distance"])
   results_csv_fp.write(first_row + "\n")
 
+  print("--- Generating results")
   # Generate the results
   for pair in user_pairs:
     p1 = pair[0]
@@ -364,7 +370,7 @@ def compare():
     # PLN intensional difference
     intdiff_tv = intensional_difference(p1, p2)
     tv_mean = intdiff_tv.mean
-    tv_conf = intdiff_tv.conf
+    tv_conf = intdiff_tv.confidence
     # DeepWalk euclidean distance
     v1 = deepwalk[p1]
     v2 = deepwalk[p2]
@@ -381,11 +387,15 @@ def compare():
   results_csv_fp.close()
 
 ### Main ###
-# load_all_atomes()
-populate_atomspace()
-generate_subsets()
-calculate_truth_values()
-infer_attractions()
-train_deepwalk_model()
-compare()
+# populate_atomspace()
+# generate_subsets()
+# calculate_truth_values()
+# infer_attractions()
 # export_all_atoms()
+# train_deepwalk_model()
+# export_deepwalk_model()
+
+load_all_atomes()
+load_deepwalk_model()
+
+compare()
