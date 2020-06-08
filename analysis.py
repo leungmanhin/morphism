@@ -37,15 +37,12 @@ def get_concepts(name_prefix):
              atomspace.get_atoms_by_type(types.ConceptNode)))
 
 def intensional_difference(c1, c2):
-  intdiff = scm(" ".join([
-    "(define bc",
-      "(gar",
-        "(pln-bc",
-          "(IntensionalDifference",
-            "(Concept \"" + c1 + "\")",
-            "(Concept \"" + c2 + "\")))))"]))
-  tv_mean = float(scm("(cog-mean bc)"))
-  tv_conf = float(scm("(cog-confidence bc)"))
+  cn1 = "(Concept \"{}\")".format(c1)
+  cn2 = "(Concept \"{}\")".format(c2)
+  intdiff = "(IntensionalDifference {} {})".format(cn1, cn2)
+  scm("(intensional-difference-direct-introduction-mooc {} {} {})".format(intdiff, cn1, cn2))
+  tv_mean = float(scm("(cog-mean {})".format(intdiff)))
+  tv_conf = float(scm("(cog-confidence {})".format(intdiff)))
   return TruthValue(tv_mean, tv_conf)
 
 ### Initialize the AtomSpace ###
@@ -340,9 +337,10 @@ def compare():
   random.shuffle(users)
   user_pairs = list(zip(users[::2], users[1::2]))
 
+  print("--- Generating results")
   # PLN setup
   scm("(pln-load 'empty)")
-  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule\")")
+  scm("(pln-load-from-path \"intensional-difference-direct-introduction-mooc.scm\")")
 
   # Output file
   results_csv_fp = open(results_csv, "w")
@@ -351,12 +349,12 @@ def compare():
     "P1 patterns",
     "P2 patterns",
     "Common patterns",
+    "Common patterns (%)",
     "IntDiff strength",
     "IntDiff confidence",
     "Vector distance"])
   results_csv_fp.write(first_row + "\n")
 
-  print("--- Generating results")
   # Generate the results
   for pair in user_pairs:
     p1 = pair[0]
@@ -367,6 +365,7 @@ def compare():
     p2_pattern_size = len(p2_patterns)
     common_patterns = set(p1_patterns).intersection(p2_patterns)
     common_pattern_size = len(common_patterns)
+    common_pattern_percent = (common_pattern_size / ((p1_pattern_size + p2_pattern_size) / 2)) * 100
     # PLN intensional difference
     intdiff_tv = intensional_difference(p1, p2)
     tv_mean = intdiff_tv.mean
@@ -380,6 +379,7 @@ def compare():
       str(p1_pattern_size),
       str(p2_pattern_size),
       str(common_pattern_size),
+      str(common_pattern_percent),
       str(tv_mean),
       str(tv_conf),
       str(vec_dist)])
@@ -387,6 +387,9 @@ def compare():
   results_csv_fp.close()
 
 ### Main ###
+load_all_atomes()
+load_deepwalk_model()
+
 # populate_atomspace()
 # generate_subsets()
 # calculate_truth_values()
@@ -394,8 +397,5 @@ def compare():
 # export_all_atoms()
 # train_deepwalk_model()
 # export_deepwalk_model()
-
-load_all_atomes()
-load_deepwalk_model()
 
 compare()
