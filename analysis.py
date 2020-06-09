@@ -361,7 +361,8 @@ def compare():
     "No. of user 1 properties",
     "No. of user 2 properties",
     "No. of common properties",
-    "Intensional Difference",
+    "Intensional Difference (U1 U2)",
+    "Intensional Difference (U2 U1)",
     "Intensional Similarity",
     "Vector distance"])
   results_csv_fp.write(first_row + "\n")
@@ -377,7 +378,8 @@ def compare():
     common_properties = set(u1_properties).intersection(u2_properties)
     common_pattern_size = len(common_properties)
     # PLN intensional difference
-    intdiff_tv = intensional_difference(u1, u2).mean
+    intdiff_u1_u2_tv = intensional_difference(u1, u2).mean
+    intdiff_u2_u1_tv = intensional_difference(u2, u1).mean
     intsim_tv = intensional_similarity(u1, u2).mean
     # DeepWalk euclidean distance
     v1 = deepwalk[u1]
@@ -389,7 +391,8 @@ def compare():
       str(u1_pattern_size),
       str(u2_pattern_size),
       str(common_pattern_size),
-      str(intdiff_tv),
+      str(intdiff_u1_u2_tv),
+      str(intdiff_u2_u1_tv),
       str(intsim_tv),
       str(vec_dist)])
     results_csv_fp.write(row + "\n")
