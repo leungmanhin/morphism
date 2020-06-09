@@ -262,7 +262,14 @@ def infer_attractions():
 
 def train_deepwalk_model():
   global deepwalk
+  next_word_dict = {}
   sentences = []
+
+  def add_to_next_word_dict(w, nw):
+    if next_word_dict.get(w):
+      next_word_dict[w].add(nw)
+    else:
+      next_word_dict[w] = {nw}
 
   def get_reverse_pred(pred):
     if pred == "has_action_target":
@@ -274,54 +281,41 @@ def train_deepwalk_model():
     else:
       raise Exception("The reverse of predicate \"{}\" is not defined!".format(pred))
 
-  if os.path.exists(sentences_pickle):
-    print("--- Loading generated sentences from \"{}\"".format(sentences_pickle))
-    with open(sentences_pickle, "rb") as f:
-      sentences = pickle.load(f)
-  else:
-    next_word_dict = {}
+  print("--- Gathering next words")
+  evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
+  for evalink in evalinks:
+    pred = evalink.out[0].name
+    rev_pred = get_reverse_pred(pred)
+    source = evalink.out[1].out[0].name
+    target = evalink.out[1].out[1].name
+    add_to_next_word_dict(source, pred)
+    add_to_next_word_dict(pred, target)
+    add_to_next_word_dict(target, rev_pred)
+    add_to_next_word_dict(rev_pred, source)
+  for k, v in next_word_dict.items():
+    next_word_dict[k] = tuple(v)
 
-    def add_to_next_word_dict(w, nw):
-      if next_word_dict.get(w):
-        next_word_dict[w].add(nw)
+  print("--- Generating sentences")
+  num_sentences = 10000000
+  sentence_length = 15
+  first_words = [x.name for x in get_concepts(user_id_prefix)]
+  for i in range(num_sentences):
+    sentence = []
+    for j in range(sentence_length):
+      if j == 0:
+        sentence.append(random.choice(first_words))
       else:
-        next_word_dict[w] = {nw}
+        last_word = sentence[-1]
+        next_words = next_word_dict.get(last_word)
+        sentence.append(random.choice(next_words))
+    sentences.append(sentence)
+    if len(sentences) % 10000 == 0:
+      print(len(sentences))
+  with open(sentences_pickle, "wb") as f:
+    pickle.dump(sentences, f)
 
-    print("--- Gathering next words")
-    evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
-    for evalink in evalinks:
-      pred = evalink.out[0].name
-      rev_pred = get_reverse_pred(pred)
-      source = evalink.out[1].out[0].name
-      target = evalink.out[1].out[1].name
-      add_to_next_word_dict(source, pred)
-      add_to_next_word_dict(pred, target)
-      add_to_next_word_dict(target, rev_pred)
-      add_to_next_word_dict(rev_pred, source)
-    for k, v in next_word_dict.items():
-      next_word_dict[k] = tuple(v)
-
-    print("--- Generating sentences")
-    num_sentences = 10000000
-    sentence_length = 15
-    first_words = [x.name for x in get_concepts(user_id_prefix)]
-    for i in range(num_sentences):
-      sentence = []
-      for j in range(sentence_length):
-        if j == 0:
-          sentence.append(random.choice(first_words))
-        else:
-          last_word = sentence[-1]
-          next_words = next_word_dict.get(last_word)
-          sentence.append(random.choice(next_words))
-      sentences.append(sentence)
-      if len(sentences) % 10000 == 0:
-        print(len(sentences))
-    with open(sentences_pickle, "wb") as f:
-      pickle.dump(sentences, f)
-
-    print("--- Training model")
-    deepwalk = Word2Vec(sentences, min_count=1)
+  print("--- Training model")
+  deepwalk = Word2Vec(sentences, min_count=1)
 
 def compare():
   print("--- Comparing PLN vs DW")
