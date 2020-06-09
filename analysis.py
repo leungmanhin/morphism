@@ -45,6 +45,15 @@ def intensional_difference(c1, c2):
   tv_conf = float(scm("(cog-confidence {})".format(intdiff)))
   return TruthValue(tv_mean, tv_conf)
 
+def intensional_similarity(c1, c2):
+  cn1 = "(Concept \"{}\")".format(c1)
+  cn2 = "(Concept \"{}\")".format(c2)
+  intsim = "(IntensionalSimilarity {} {})".format(cn1, cn2)
+  scm("(pln-bc {})".format(intsim))
+  tv_mean = float(scm("(cog-mean {})".format(intsim)))
+  tv_conf = float(scm("(cog-confidence {})".format(intsim)))
+  return TruthValue(tv_mean, tv_conf)
+
 ### Initialize the AtomSpace ###
 atomspace = AtomSpace()
 initialize_opencog(atomspace)
@@ -318,7 +327,7 @@ def compare():
   print("--- Comparing PLN vs DW")
 
   node_pattern_dict = {}
-  def get_patterns(node):
+  def get_properties(node):
     def get_subsets(node):
       return list(
                filter(
@@ -342,47 +351,46 @@ def compare():
   scm("(pln-load 'empty)")
   scm("(pln-load-from-path \"intensional-difference-direct-introduction-mooc.scm\")")
   scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule-mooc\")")
+  scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
 
   # Output file
   results_csv_fp = open(results_csv, "w")
   first_row = ",".join([
-    "Pair",
-    "P1 patterns",
-    "P2 patterns",
-    "Common patterns",
-    "Common patterns (%)",
-    "IntDiff strength",
-    "IntDiff confidence",
+    "User 1",
+    "User 2",
+    "No. of user 1 properties",
+    "No. of user 2 properties",
+    "No. of common properties",
+    "Intensional Difference",
+    "Intensional Similarity",
     "Vector distance"])
   results_csv_fp.write(first_row + "\n")
 
   # Generate the results
   for pair in user_pairs:
-    p1 = pair[0]
-    p2 = pair[1]
-    p1_patterns = get_patterns(ConceptNode(p1))
-    p2_patterns = get_patterns(ConceptNode(p2))
-    p1_pattern_size = len(p1_patterns)
-    p2_pattern_size = len(p2_patterns)
-    common_patterns = set(p1_patterns).intersection(p2_patterns)
-    common_pattern_size = len(common_patterns)
-    common_pattern_percent = (common_pattern_size / ((p1_pattern_size + p2_pattern_size) / 2)) * 100
+    u1 = pair[0]
+    u2 = pair[1]
+    u1_properties = get_properties(ConceptNode(u1))
+    u2_properties = get_properties(ConceptNode(u2))
+    u1_pattern_size = len(u1_properties)
+    u2_pattern_size = len(u2_properties)
+    common_properties = set(u1_properties).intersection(u2_properties)
+    common_pattern_size = len(common_properties)
     # PLN intensional difference
-    intdiff_tv = intensional_difference(p1, p2)
-    tv_mean = intdiff_tv.mean
-    tv_conf = intdiff_tv.confidence
+    intdiff_tv = intensional_difference(u1, u2).mean
+    intsim_tv = intensional_similarity(u1, u2).mean
     # DeepWalk euclidean distance
-    v1 = deepwalk[p1]
-    v2 = deepwalk[p2]
+    v1 = deepwalk[u1]
+    v2 = deepwalk[u2]
     vec_dist = distance.euclidean(v1, v2)
     row = ",".join([
-      p1 + " " + p2,
-      str(p1_pattern_size),
-      str(p2_pattern_size),
+      u1,
+      u2,
+      str(u1_pattern_size),
+      str(u2_pattern_size),
       str(common_pattern_size),
-      str(common_pattern_percent),
-      str(tv_mean),
-      str(tv_conf),
+      str(intdiff_tv),
+      str(intsim_tv),
       str(vec_dist)])
     results_csv_fp.write(row + "\n")
   results_csv_fp.close()
