@@ -40,7 +40,7 @@ def intensional_difference(c1, c2):
   cn1 = "(Concept \"{}\")".format(c1)
   cn2 = "(Concept \"{}\")".format(c2)
   intdiff = "(IntensionalDifference {} {})".format(cn1, cn2)
-  scm("(intensional-difference-direct-introduction-mooc {} {} {})".format(intdiff, cn1, cn2))
+  scm("(pln-bc {})".format(intdiff))
   tv_mean = float(scm("(cog-mean {})".format(intdiff)))
   tv_conf = float(scm("(cog-confidence {})".format(intdiff)))
   return TruthValue(tv_mean, tv_conf)
@@ -341,6 +341,7 @@ def compare():
   # PLN setup
   scm("(pln-load 'empty)")
   scm("(pln-load-from-path \"intensional-difference-direct-introduction-mooc.scm\")")
+  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule-mooc\")")
 
   # Output file
   results_csv_fp = open(results_csv, "w")

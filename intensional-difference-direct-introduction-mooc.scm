@@ -1,6 +1,42 @@
 ;; NOTE: This is a copy of the original intensional-difference-direct-introduction rule,
 ;; in the PLN repo, with a slight modification to fit the dataset in this experiment
 
+;; Rule
+(define intensional-difference-direct-introduction-rule-mooc
+  (let* ((A (Variable "$A"))
+         (B (Variable "$B"))
+         (X (Variable "$X"))
+         (CT (Type "ConceptNode")))
+    (Bind
+      (VariableSet
+        (TypedVariable A CT)
+        (TypedVariable B CT))
+      (And
+        (Present
+          A
+          B)
+        ;; There exists X such that
+        ;;
+        ;; (Attraction A X)
+        ;; (Attraction B X)
+        ;;
+        ;; are present in the atomspace
+        (Satisfaction
+          (TypedVariable X CT)
+          (Present
+            (Attraction A X)
+            (Attraction B X)))
+        ;; A and B are different
+        (Not (Equal A B)))
+      (ExecutionOutput
+        (GroundedSchema "scm: intensional-difference-direct-introduction-mooc")
+        (List
+          ;; Conclusion
+          (IntensionalDifference A B)
+          ;; Premises
+          A
+          B)))))
+
 ;; Formula
 (define (intensional-difference-direct-introduction-mooc conclusion . premises)
   ;; Given a concept return all attraction link
@@ -60,3 +96,9 @@
              (TVc (count->confidence dnt))
              (TV (stv TVs TVc)))
         (if (< 0 TVc) (cog-merge-hi-conf-tv! IntDiff TV)))))
+
+; Name the rule
+(define intensional-difference-direct-introduction-rule-name-mooc
+  (DefinedSchemaNode "intensional-difference-direct-introduction-rule-mooc"))
+(DefineLink intensional-difference-direct-introduction-rule-name-mooc
+  intensional-difference-direct-introduction-rule-mooc)
