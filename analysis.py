@@ -2,11 +2,13 @@ import os
 import pickle
 import random
 from gensim.models import Word2Vec
+from matplotlib import pyplot
 from opencog.atomspace import AtomSpace, types
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
+from sklearn.decomposition import PCA
 
 mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
 mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
@@ -17,6 +19,7 @@ subset_links_scm = os.getcwd() + "/results/subset-links.scm"
 attraction_links_scm = os.getcwd() + "/results/attraction-links.scm"
 sentences_pickle = os.getcwd() + "/results/sentences.pickle"
 deepwalk_bin = os.getcwd() + "/results/deepwalk.bin"
+deepwalk_plot_png = os.getcwd() + "/results/deepwalk_plot.png"
 results_csv = os.getcwd() + "/results/results.csv"
 
 course_id_prefix = "course:"
@@ -317,6 +320,17 @@ def train_deepwalk_model():
   print("--- Training model")
   deepwalk = Word2Vec(sentences, min_count=1)
 
+def plot_deepwalk_model():
+  print("--- Plotting")
+  X = deepwalk[deepwalk.wv.vocab]
+  pca = PCA(n_components = 2)
+  result = pca.fit_transform(X)
+  pyplot.scatter(result[:, 0], result[:, 1])
+  words = list(deepwalk.wv.vocab)
+  for i, word in enumerate(words):
+    pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
+  pyplot.savefig(deepwalk_plot_png, dpi=1000)
+
 def compare():
   print("--- Comparing PLN vs DW")
 
@@ -403,5 +417,6 @@ load_deepwalk_model()
 # export_all_atoms()
 # train_deepwalk_model()
 # export_deepwalk_model()
+# plot_deepwalk_model()
 
 compare()
