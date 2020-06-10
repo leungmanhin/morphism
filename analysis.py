@@ -348,6 +348,12 @@ def compare():
       node_pattern_dict[node] = pats
     return pats
 
+  def has_dropped_out(user):
+    u_cpt = "(Concept \"{}\")".format(user)
+    d_cpt = "(Concept \"dropped-out\")"
+    result = scm("(equal? (list) (cog-link 'AttractionLink {} {}))".format(u_cpt, d_cpt))
+    return result.strip() == "#f"
+
   # Get the user pairs
   print("--- Generating user pairs")
   users = [x.name for x in get_concepts(user_id_prefix)]
@@ -366,6 +372,8 @@ def compare():
   first_row = ",".join([
     "User 1",
     "User 2",
+    "User 1 dropped out?",
+    "User 2 dropped out?",
     "No. of user 1 properties",
     "No. of user 2 properties",
     "No. of common properties",
@@ -379,6 +387,8 @@ def compare():
   for pair in user_pairs:
     u1 = pair[0]
     u2 = pair[1]
+    u1_dropout = has_dropped_out(u1)
+    u2_dropout = has_dropped_out(u2)
     u1_properties = get_properties(ConceptNode(u1))
     u2_properties = get_properties(ConceptNode(u2))
     u1_pattern_size = len(u1_properties)
@@ -396,6 +406,8 @@ def compare():
     row = ",".join([
       u1,
       u2,
+      str(u1_dropout),
+      str(u2_dropout),
       str(u1_pattern_size),
       str(u2_pattern_size),
       str(common_pattern_size),
