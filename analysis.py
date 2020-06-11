@@ -187,6 +187,9 @@ def populate_atomspace():
       if action_id in dropout_action_ids:
         scm(memblink(course_name, "dropped-out"))
         scm(evalink("has", user_name, "dropped-out"))
+      else:
+        scm(memblink(course_name, "not-dropped-out"))
+        scm(evalink("has", user_name, "not-dropped-out"))
 
 def generate_subsets():
   print("--- Generating SubsetLinks")
