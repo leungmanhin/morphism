@@ -294,10 +294,8 @@ def train_deepwalk_model():
     rev_pred = get_reverse_pred(pred)
     source = evalink.out[1].out[0].name
     target = evalink.out[1].out[1].name
-    add_to_next_word_dict(source, pred)
-    add_to_next_word_dict(pred, target)
-    add_to_next_word_dict(target, rev_pred)
-    add_to_next_word_dict(rev_pred, source)
+    add_to_next_word_dict(source, (pred, target))
+    add_to_next_word_dict(target, (rev_pred, source))
   for k, v in next_word_dict.items():
     next_word_dict[k] = tuple(v)
 
@@ -312,8 +310,9 @@ def train_deepwalk_model():
         sentence.append(random.choice(first_words))
       else:
         last_word = sentence[-1]
-        next_words = next_word_dict.get(last_word)
-        sentence.append(random.choice(next_words))
+        next_words = random.choice(next_word_dict.get(last_word))
+        sentence.append(next_words[0])
+        sentence.append(next_words[1])
     sentences.append(sentence)
     if len(sentences) % 10000 == 0:
       print(len(sentences))
