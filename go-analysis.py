@@ -124,13 +124,66 @@ def infer_subsets_and_members():
       "#:maximum-iterations 12",
       "#:fc-full-rule-application #t)"]))
 
+def calculate_truth_values():
+  print("--- Calculating Truth Values")
+
+  node_member_dict = {}
+  def get_members(node):
+    if node_member_dict.get(node):
+      return node_member_dict[node]
+    else:
+      memblinks = filter(lambda x : x.type == types.MemberLink and x.out[1] == node, node.incoming)
+      members = [x.out[0] for x in tuple(memblinks)]
+      node_member_dict[node] = members
+      return members
+
+  def get_confidence(count):
+    return float(scm("(count->confidence " + str(count) + ")"))
+
+  # MemberLinks are generated directly from the data, can be considered as true
+  for m in atomspace.get_atoms_by_type(types.MemberLink):
+    m.tv = TruthValue(1, 1)
+
+  # ConceptNode "A" (stv s c)
+  # where:
+  # s = |A| / |universe|
+  # c = |universe|
+  universe_size = int(scm("(length (cog-get-atoms 'GeneNode))"))
+  tv_confidence = get_confidence(universe_size)
+  for c in get_concepts("GO:"):
+    member_size = len(get_members(c))
+    tv_strength = member_size / universe_size
+    c.tv = TruthValue(tv_strength, tv_confidence)
+
+  # SubLinks are generated directly from the data, and is true by definition
+  for s in atomspace.get_atoms_by_type(types.SubsetLink):
+    s.tv = TruthValue(1, 1)
+
+  # Infer the inverse subsets
+  scm(" ".join([
+    "(define (true-subset-inverse S)",
+      "(let* ((A (gar S))",
+             "(B (gdr S))",
+             "(ATV (cog-tv A))",
+             "(BTV (cog-tv B))",
+             "(A-positive-count (* (cog-tv-mean ATV) (cog-tv-count ATV)))",
+             "(B-positive-count (* (cog-tv-mean BTV) (cog-tv-count BTV)))",
+             "(TV-strength (if (< 0 B-positive-count)",
+                              "(exact->inexact (/ A-positive-count B-positive-count))",
+                              "1))",
+             "(TV-count B-positive-count)",
+             "(TV-confidence (count->confidence TV-count))",
+             "(TV (stv TV-strength TV-confidence)))",
+        "(Subset TV B A)))"]))
+  scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
+
 ### Main ###
 # load_all_atomes()
 # load_deepwalk_model()
 
 populate_atomspace()
 infer_subsets_and_members()
-# calculate_truth_values()
+calculate_truth_values()
 # infer_attractions()
 # export_all_atoms()
 # train_deepwalk_model()
