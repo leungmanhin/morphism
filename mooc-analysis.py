@@ -64,7 +64,7 @@ initialize_opencog(atomspace)
 ### Guile setup ###
 scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
 scm("(add-to-load-path \".\")")
-scm("(use-modules (opencog) (opencog bioscience) (opencog ure) (opencog pln))")
+scm("(use-modules (opencog) (opencog ure) (opencog pln))")
 scm(" ".join([
   "(define (write-atoms-to-file file atoms)",
     "(define fp (open-output-file file))",
