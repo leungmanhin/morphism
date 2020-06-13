@@ -102,12 +102,34 @@ def populate_atomspace():
   scm("(load-file \"" + go_scm + "\")")
   scm("(load-file \"" + go_annotation_scm + "\")")
 
+### Infer subsets and members ###
+def infer_subsets_and_members():
+  print("--- Inferring subsets and new members")
+  scm("(pln-load 'empty)")
+  scm("(pln-load-from-path \"rules/translation.scm\")")
+  scm("(pln-load-from-path \"rules/transitivity.scm\")")
+  # (Inheritance C1 C2) |- (Subset C1 C2)
+  scm("(pln-add-rule-by-name \"present-inheritance-to-subset-translation-rule\")")
+  # (Subset C1 C2) (Subset C2 C3) |- (Subset C1 C3)
+  scm("(pln-add-rule-by-name \"present-subset-transitivity-rule\")")
+  # (Member G C1) (Subset C1 C2) |- (Member G C2)
+  scm("(pln-add-rule-by-name \"present-mixed-member-subset-transitivity-rule\")")
+  scm(" ".join([
+    "(pln-fc",
+      "(Inheritance (Variable \"$X\") (Variable \"$Y\"))",
+      "#:vardecl",
+        "(VariableSet",
+          "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+          "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+      "#:maximum-iterations 12",
+      "#:fc-full-rule-application #t)"]))
+
 ### Main ###
 # load_all_atomes()
 # load_deepwalk_model()
 
 populate_atomspace()
-# generate_subsets()
+infer_subsets_and_members()
 # calculate_truth_values()
 # infer_attractions()
 # export_all_atoms()
