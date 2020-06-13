@@ -365,7 +365,7 @@ def compare():
   print("--- Generating results")
   # PLN setup
   scm("(pln-load 'empty)")
-  scm("(pln-load-from-path \"intensional-difference-direct-introduction-mooc.scm\")")
+  scm("(pln-load-from-path \"rules/intensional-difference-direct-introduction-mooc.scm\")")
   scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule-mooc\")")
   scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
 
