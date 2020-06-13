@@ -177,6 +177,22 @@ def calculate_truth_values():
         "(Subset TV B A)))"]))
   scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
 
+def infer_attractions():
+  print("--- Inferring AttractionLinks")
+  scm("(pln-load 'empty)")
+  # (Subset A B) |- (Subset (Not A) B)
+  scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+  # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
+  scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
+  scm(" ".join(["(pln-bc",
+                  "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
+                  "#:vardecl",
+                    "(VariableSet",
+                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                  "#:maximum-iterations 12",
+                  "#:complexity-penalty 10)"]))
+
 ### Main ###
 # load_all_atomes()
 # load_deepwalk_model()
@@ -184,8 +200,8 @@ def calculate_truth_values():
 populate_atomspace()
 infer_subsets_and_members()
 calculate_truth_values()
-# infer_attractions()
-# export_all_atoms()
+infer_attractions()
+export_all_atoms()
 # train_deepwalk_model()
 # export_deepwalk_model()
 # plot_pca()
