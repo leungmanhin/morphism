@@ -24,6 +24,7 @@ deepwalk_bin = os.getcwd() + "/results/deepwalk.bin"
 pca_png = os.getcwd() + "/results/pca.png"
 results_csv = os.getcwd() + "/results/results.csv"
 
+go_term_prefix = "GO:"
 deepwalk = None
 
 ### Utils ###
@@ -153,7 +154,7 @@ def calculate_truth_values():
   # c = |universe|
   universe_size = int(scm("(length (cog-get-atoms 'GeneNode))"))
   tv_confidence = get_confidence(universe_size)
-  for c in get_concepts("GO:"):
+  for c in get_concepts(go_term_prefix):
     member_size = len(get_members(c))
     tv_strength = member_size / universe_size
     c.tv = TruthValue(tv_strength, tv_confidence)
@@ -196,17 +197,74 @@ def infer_attractions():
                   "#:maximum-iterations 12",
                   "#:complexity-penalty 10)"]))
 
+def train_deepwalk_model():
+  global deepwalk
+  next_word_dict = {}
+  sentences = []
+
+  def add_to_next_word_dict(w, nw):
+    if next_word_dict.get(w):
+      next_word_dict[w].append(nw)
+    else:
+      next_word_dict[w] = [nw]
+
+  print("--- Gathering next words")
+  inhlinks = atomspace.get_atoms_by_type(types.InheritanceLink)
+  for inhlink in inhlinks:
+    child = inhlink.out[0].name
+    parent = inhlink.out[1].name
+    pred = "inherits-geneontologyterm"
+    rev_pred = "geneontologyterm-inherited-by"
+    add_to_next_word_dict(child, (pred, parent))
+    add_to_next_word_dict(parent, (rev_pred, child))
+  for k, v in next_word_dict.items():
+    next_word_dict[k] = list(v)
+
+  memblinks = atomspace.get_atoms_by_type(types.MemberLink)
+  for memblink in memblinks:
+    child = memblink.out[0].name
+    parent = memblink.out[1].name
+    pred = "in-gene-ontology"
+    rev_pred = "has-gene-ontology-member"
+    add_to_next_word_dict(child, (pred, parent))
+    add_to_next_word_dict(parent, (rev_pred, child))
+  for k, v in next_word_dict.items():
+    next_word_dict[k] = list(v)
+
+  print("--- Generating sentences")
+  num_sentences = 10000000
+  sentence_length = 15
+  first_words = [x.name for x in get_concepts(go_term_prefix)]
+  for i in range(num_sentences):
+    sentence = []
+    for j in range(sentence_length):
+      if j == 0:
+        sentence.append(random.choice(first_words))
+      else:
+        last_word = sentence[-1]
+        next_words = random.choice(next_word_dict.get(last_word))
+        sentence.append(next_words[0])
+        sentence.append(next_words[1])
+    sentences.append(sentence)
+    if len(sentences) % 10000 == 0:
+      print(len(sentences))
+  with open(sentences_pickle, "wb") as f:
+    pickle.dump(sentences, f)
+
+  print("--- Training model")
+  deepwalk = Word2Vec(sentences, min_count=1)
+
 ### Main ###
-# load_all_atomes()
+load_all_atomes()
 # load_deepwalk_model()
 
-populate_atomspace()
-infer_subsets_and_members()
-calculate_truth_values()
-infer_attractions()
-export_all_atoms()
-# train_deepwalk_model()
-# export_deepwalk_model()
+# populate_atomspace()
+# infer_subsets_and_members()
+# calculate_truth_values()
+# infer_attractions()
+# export_all_atoms()
+train_deepwalk_model()
+export_deepwalk_model()
 # plot_pca()
 
 # compare()
