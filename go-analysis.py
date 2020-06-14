@@ -254,17 +254,28 @@ def train_deepwalk_model():
   print("--- Training model")
   deepwalk = Word2Vec(sentences, min_count=1)
 
+def plot_pca():
+  print("--- Plotting")
+  X = deepwalk[deepwalk.wv.vocab]
+  pca = PCA(n_components = 2)
+  result = pca.fit_transform(X)
+  pyplot.scatter(result[:, 0], result[:, 1])
+  words = list(deepwalk.wv.vocab)
+  for i, word in enumerate(words):
+    pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
+  pyplot.savefig(pca_png, dpi=1000)
+
 ### Main ###
 load_all_atomes()
-# load_deepwalk_model()
+load_deepwalk_model()
 
 # populate_atomspace()
 # infer_subsets_and_members()
 # calculate_truth_values()
 # infer_attractions()
 # export_all_atoms()
-train_deepwalk_model()
-export_deepwalk_model()
-# plot_pca()
+# train_deepwalk_model()
+# export_deepwalk_model()
+plot_pca()
 
 # compare()
