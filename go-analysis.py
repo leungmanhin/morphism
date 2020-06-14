@@ -4,11 +4,14 @@ import random
 from gensim.models import Word2Vec
 from matplotlib import pyplot
 from opencog.atomspace import AtomSpace, types
+from opencog.logger import log
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
 from sklearn.decomposition import PCA
+
+log.set_level("ERROR")
 
 go_scm = os.getcwd() + "/datasets/GO_2020-04-01.scm"
 go_annotation_scm = os.getcwd() + "/datasets/GO_annotation_gene-level_2020-04-01.scm"
