@@ -199,14 +199,14 @@ def infer_attractions():
 
 def train_deepwalk_model():
   global deepwalk
-  next_word_dict = {}
+  next_words_dict = {}
   sentences = []
 
-  def add_to_next_word_dict(w, nw):
-    if next_word_dict.get(w):
-      next_word_dict[w].append(nw)
+  def add_to_next_words_dict(w, nw):
+    if next_words_dict.get(w):
+      next_words_dict[w].append(nw)
     else:
-      next_word_dict[w] = [nw]
+      next_words_dict[w] = [nw]
 
   print("--- Gathering next words")
   inhlinks = atomspace.get_atoms_by_type(types.InheritanceLink)
@@ -215,10 +215,10 @@ def train_deepwalk_model():
     parent = inhlink.out[1].name
     pred = "inherits-geneontologyterm"
     rev_pred = "geneontologyterm-inherited-by"
-    add_to_next_word_dict(child, (pred, parent))
-    add_to_next_word_dict(parent, (rev_pred, child))
-  for k, v in next_word_dict.items():
-    next_word_dict[k] = list(v)
+    add_to_next_words_dict(child, (pred, parent))
+    add_to_next_words_dict(parent, (rev_pred, child))
+  for k, v in next_words_dict.items():
+    next_words_dict[k] = list(v)
 
   memblinks = atomspace.get_atoms_by_type(types.MemberLink)
   for memblink in memblinks:
@@ -226,25 +226,22 @@ def train_deepwalk_model():
     parent = memblink.out[1].name
     pred = "in-gene-ontology"
     rev_pred = "has-gene-ontology-member"
-    add_to_next_word_dict(child, (pred, parent))
-    add_to_next_word_dict(parent, (rev_pred, child))
-  for k, v in next_word_dict.items():
-    next_word_dict[k] = list(v)
+    add_to_next_words_dict(child, (pred, parent))
+    add_to_next_words_dict(parent, (rev_pred, child))
+  for k, v in next_words_dict.items():
+    next_words_dict[k] = list(v)
 
   print("--- Generating sentences")
   num_sentences = 10000000
-  sentence_length = 15
+  num_walks = 7
   first_words = [x.name for x in get_concepts(go_term_prefix)]
   for i in range(num_sentences):
-    sentence = []
-    for j in range(sentence_length):
-      if j == 0:
-        sentence.append(random.choice(first_words))
-      else:
-        last_word = sentence[-1]
-        next_words = random.choice(next_word_dict.get(last_word))
-        sentence.append(next_words[0])
-        sentence.append(next_words[1])
+    sentence = [random.choice(first_words)]
+    for j in range(num_walks):
+      last_word = sentence[-1]
+      next_words = random.choice(next_words_dict.get(last_word))
+      sentence.append(next_words[0])
+      sentence.append(next_words[1])
     sentences.append(sentence)
     if len(sentences) % 10000 == 0:
       print(len(sentences))
@@ -345,15 +342,15 @@ def compare():
 
 ### Main ###
 load_all_atomes()
-load_deepwalk_model()
+# load_deepwalk_model()
 
 # populate_atomspace()
 # infer_subsets_and_members()
 # calculate_truth_values()
 # infer_attractions()
 # export_all_atoms()
-# train_deepwalk_model()
-# export_deepwalk_model()
+train_deepwalk_model()
+export_deepwalk_model()
 # plot_pca()
 
 compare()

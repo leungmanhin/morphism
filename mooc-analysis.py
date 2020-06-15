@@ -268,14 +268,14 @@ def infer_attractions():
 
 def train_deepwalk_model():
   global deepwalk
-  next_word_dict = {}
+  next_words_dict = {}
   sentences = []
 
-  def add_to_next_word_dict(w, nw):
-    if next_word_dict.get(w):
-      next_word_dict[w].add(nw)
+  def add_to_next_words_dict(w, nw):
+    if next_words_dict.get(w):
+      next_words_dict[w].add(nw)
     else:
-      next_word_dict[w] = {nw}
+      next_words_dict[w] = {nw}
 
   def get_reverse_pred(pred):
     if pred == "has_action_target":
@@ -294,25 +294,22 @@ def train_deepwalk_model():
     rev_pred = get_reverse_pred(pred)
     source = evalink.out[1].out[0].name
     target = evalink.out[1].out[1].name
-    add_to_next_word_dict(source, (pred, target))
-    add_to_next_word_dict(target, (rev_pred, source))
-  for k, v in next_word_dict.items():
-    next_word_dict[k] = tuple(v)
+    add_to_next_words_dict(source, (pred, target))
+    add_to_next_words_dict(target, (rev_pred, source))
+  for k, v in next_words_dict.items():
+    next_words_dict[k] = tuple(v)
 
   print("--- Generating sentences")
   num_sentences = 10000000
-  sentence_length = 15
+  num_walks = 15
   first_words = [x.name for x in get_concepts(user_id_prefix)]
   for i in range(num_sentences):
-    sentence = []
+    sentence = [random.choice(first_words)]
     for j in range(sentence_length):
-      if j == 0:
-        sentence.append(random.choice(first_words))
-      else:
-        last_word = sentence[-1]
-        next_words = random.choice(next_word_dict.get(last_word))
-        sentence.append(next_words[0])
-        sentence.append(next_words[1])
+      last_word = sentence[-1]
+      next_words = random.choice(next_words_dict.get(last_word))
+      sentence.append(next_words[0])
+      sentence.append(next_words[1])
     sentences.append(sentence)
     if len(sentences) % 10000 == 0:
       print(len(sentences))
