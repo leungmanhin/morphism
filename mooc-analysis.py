@@ -418,16 +418,16 @@ def compare():
   results_csv_fp.close()
 
 ### Main ###
-load_all_atomes()
-load_deepwalk_model()
+# load_all_atomes()
+# load_deepwalk_model()
 
-# populate_atomspace()
-# generate_subsets()
-# calculate_truth_values()
-# infer_attractions()
-# export_all_atoms()
-# train_deepwalk_model()
-# export_deepwalk_model()
-# plot_pca()
+populate_atomspace()
+generate_subsets()
+calculate_truth_values()
+infer_attractions()
+export_all_atoms()
+train_deepwalk_model()
+export_deepwalk_model()
+plot_pca()
 
 compare()
