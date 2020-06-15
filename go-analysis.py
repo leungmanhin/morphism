@@ -265,6 +265,84 @@ def plot_pca():
     pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
   pyplot.savefig(pca_png, dpi=1000)
 
+def compare():
+  print("--- Comparing PLN vs DW")
+
+  node_pattern_dict = {}
+  def get_properties(node):
+    def get_subsets(node):
+      return list(
+               filter(
+                 lambda x : x.type == types.SubsetLink and x.out[0] == node,
+                 node.incoming))
+    if node_pattern_dict.get(node):
+      return node_pattern_dict[node]
+    else:
+      pats = [x.out[1] for x in get_subsets(node)]
+      node_pattern_dict[node] = pats
+    return pats
+
+  # Get the user pairs
+  print("--- Generating GO term pairs")
+  gos = [x.name for x in get_concepts(go_term_prefix)]
+  random.shuffle(gos)
+  go_pairs = list(zip(gos[::2], gos[1::2]))
+
+  print("--- Generating results")
+  # PLN setup
+  scm("(pln-load 'empty)")
+  # TODO: Check the size of the universe
+  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule\")")
+  scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
+
+  # Output file
+  results_csv_fp = open(results_csv, "w")
+  first_row = ",".join([
+    "GO 1",
+    "GO 2",
+    "No. of GO 1 properties",
+    "No. of GO 2 properties",
+    "No. of common properties",
+    "Intensional Difference (GO1 GO2)",
+    "Intensional Difference (GO2 GO1)",
+    "Intensional Similarity",
+    "Vector distance"])
+  results_csv_fp.write(first_row + "\n")
+
+  # Generate the results
+  for pair in go_pairs:
+    go1 = pair[0]
+    go2 = pair[1]
+    go1_properties = get_properties(ConceptNode(go1))
+    go2_properties = get_properties(ConceptNode(go2))
+    go1_pattern_size = len(go1_properties)
+    go2_pattern_size = len(go2_properties)
+    common_properties = set(go1_properties).intersection(go2_properties)
+    common_pattern_size = len(common_properties)
+    # PLN intensional difference
+    intdiff_go1_go2_tv = intensional_difference(go1, go2)
+    intdiff_go1_go2_tv_mean = intdiff_go1_go2_tv.mean if intdiff_go1_go2_tv.confidence > 0 else 0
+    intdiff_go2_go1_tv = intensional_difference(go2, go1)
+    intdiff_go2_go1_tv_mean = intdiff_go2_go1_tv.mean if intdiff_go2_go1_tv.confidence > 0 else 0
+    intsim_tv = intensional_similarity(go1, go2)
+    intsim_tv_mean = intsim_tv.mean if intsim_tv.confidence > 0 else 0
+    # DeepWalk euclidean distance
+    v1 = deepwalk[go1]
+    v2 = deepwalk[go2]
+    vec_dist = distance.euclidean(v1, v2)
+    row = ",".join([
+      go1,
+      go2,
+      str(go1_pattern_size),
+      str(go2_pattern_size),
+      str(common_pattern_size),
+      str(intdiff_go1_go2_tv_mean),
+      str(intdiff_go2_go1_tv_mean),
+      str(intsim_tv_mean),
+      str(vec_dist)])
+    results_csv_fp.write(row + "\n")
+  results_csv_fp.close()
+
 ### Main ###
 load_all_atomes()
 load_deepwalk_model()
@@ -276,6 +354,6 @@ load_deepwalk_model()
 # export_all_atoms()
 # train_deepwalk_model()
 # export_deepwalk_model()
-plot_pca()
+# plot_pca()
 
-# compare()
+compare()
