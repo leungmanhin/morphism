@@ -335,15 +335,15 @@ def compare():
 
   node_pattern_dict = {}
   def get_properties(node):
-    def get_subsets(node):
+    def get_attractions(node):
       return list(
                filter(
-                 lambda x : x.type == types.SubsetLink and x.out[0] == node,
+                 lambda x : x.type == types.AttractionLink and x.out[0] == node,
                  node.incoming))
     if node_pattern_dict.get(node):
       return node_pattern_dict[node]
     else:
-      pats = [x.out[1] for x in get_subsets(node)]
+      pats = [x.out[1] for x in get_attractions(node)]
       node_pattern_dict[node] = pats
     return pats
 
