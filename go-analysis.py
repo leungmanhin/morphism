@@ -13,6 +13,9 @@ from sklearn.decomposition import PCA
 
 log.set_level("ERROR")
 
+# Whether to consider subsets to be true by definition and assign (stv 1 1) to them
+subset_true_by_definition = True
+
 go_scm = os.getcwd() + "/datasets/GO_2020-04-01.scm"
 go_annotation_scm = os.getcwd() + "/datasets/GO_annotation_gene-level_2020-04-01.scm"
 member_links_scm = os.getcwd() + "/results/member-links.scm"
@@ -127,6 +130,11 @@ def infer_subsets_and_members():
           "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
       "#:maximum-iterations 12",
       "#:fc-full-rule-application #t)"]))
+  if not subset_true_by_definition:
+    for s in atomspace.get_atoms_by_type(types.SubsetLink):
+      node1 = s.out[0]
+      node2 = s.out[1]
+      SubsetLink(node2, node1)
 
 def calculate_truth_values():
   print("--- Calculating Truth Values")
@@ -159,27 +167,44 @@ def calculate_truth_values():
     tv_strength = member_size / universe_size
     c.tv = TruthValue(tv_strength, tv_confidence)
 
-  # SubLinks are generated directly from the data, and is true by definition
-  for s in atomspace.get_atoms_by_type(types.SubsetLink):
-    s.tv = TruthValue(1, 1)
+  if subset_true_by_definition:
+    # SubLinks are generated directly from the data, and is true by definition
+    for s in atomspace.get_atoms_by_type(types.SubsetLink):
+      s.tv = TruthValue(1, 1)
 
-  # Infer the inverse subsets
-  scm(" ".join([
-    "(define (true-subset-inverse S)",
-      "(let* ((A (gar S))",
-             "(B (gdr S))",
-             "(ATV (cog-tv A))",
-             "(BTV (cog-tv B))",
-             "(A-positive-count (* (cog-tv-mean ATV) (cog-tv-count ATV)))",
-             "(B-positive-count (* (cog-tv-mean BTV) (cog-tv-count BTV)))",
-             "(TV-strength (if (< 0 B-positive-count)",
-                              "(exact->inexact (/ A-positive-count B-positive-count))",
-                              "1))",
-             "(TV-count B-positive-count)",
-             "(TV-confidence (count->confidence TV-count))",
-             "(TV (stv TV-strength TV-confidence)))",
-        "(Subset TV B A)))"]))
-  scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
+    # Infer the inverse subsets
+    scm(" ".join([
+      "(define (true-subset-inverse S)",
+        "(let* ((A (gar S))",
+               "(B (gdr S))",
+               "(ATV (cog-tv A))",
+               "(BTV (cog-tv B))",
+               "(A-positive-count (* (cog-tv-mean ATV) (cog-tv-count ATV)))",
+               "(B-positive-count (* (cog-tv-mean BTV) (cog-tv-count BTV)))",
+               "(TV-strength (if (< 0 B-positive-count)",
+                                "(exact->inexact (/ A-positive-count B-positive-count))",
+                                "1))",
+               "(TV-count B-positive-count)",
+               "(TV-confidence (count->confidence TV-count))",
+               "(TV (stv TV-strength TV-confidence)))",
+          "(Subset TV B A)))"]))
+    scm("(map true-subset-inverse (cog-get-atoms 'SubsetLink))")
+  else:
+    # SubsetLink (stv s c)
+    #   A
+    #   B
+    # where:
+    # s = |B intersect A| / |A|
+    # c = |A|
+    for s in atomspace.get_atoms_by_type(types.SubsetLink):
+      node1 = s.out[0]
+      node2 = s.out[1]
+      node1_members = get_members(node1)
+      node2_members = get_members(node2)
+      common_members = set(node2_members).intersection(node1_members)
+      tv_strength = len(common_members) / len(node1_members) if len(node1_members) > 0 else 0
+      tv_confidence = get_confidence(len(node1_members))
+      s.tv = TruthValue(tv_strength, tv_confidence)
 
 def infer_attractions():
   print("--- Inferring AttractionLinks")
