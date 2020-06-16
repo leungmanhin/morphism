@@ -3,6 +3,8 @@ import pickle
 import random
 from gensim.models import Word2Vec
 from matplotlib import pyplot
+from goatools import obo_parser
+from goatools.semantic import deepest_common_ancestor
 from opencog.atomspace import AtomSpace, types
 from opencog.logger import log
 from opencog.scheme_wrapper import scheme_eval
@@ -16,6 +18,7 @@ log.set_level("ERROR")
 # Whether to consider subsets to be true by definition and assign (stv 1 1) to them
 subset_true_by_definition = True
 
+go_basic_obo = os.getcwd() + "/datasets/go-basic.obo"
 go_scm = os.getcwd() + "/datasets/GO_2020-04-01.scm"
 go_annotation_scm = os.getcwd() + "/datasets/GO_annotation_gene-level_2020-04-01.scm"
 member_links_scm = os.getcwd() + "/results/member-links.scm"
@@ -28,7 +31,9 @@ pca_png = os.getcwd() + "/results/pca.png"
 results_csv = os.getcwd() + "/results/results.csv"
 
 go_term_prefix = "GO:"
+
 deepwalk = None
+go_dag = obo_parser.GODag(go_basic_obo)
 
 ### Utils ###
 def scm(atomese):
@@ -304,6 +309,16 @@ def compare():
       node_pattern_dict[node] = pats
     return pats
 
+  def dag_distance(go1, go2):
+    try:
+      common_go = deepest_common_ancestor([go1, go2], go_dag)
+      go1_depth = go_dag[go1].depth
+      go2_depth = go_dag[go2].depth
+      common_go_depth = go_dag[common_go].depth
+      return go1_depth + go2_depth - 2 * common_go_depth
+    except:
+      return "NA"
+
   # Get the user pairs
   print("--- Generating GO term pairs")
   gos = [x.name for x in get_concepts(go_term_prefix)]
@@ -322,10 +337,12 @@ def compare():
   first_row = ",".join([
     "GO 1",
     "GO 2",
+    "GO 1 depth",
+    "GO 2 depth",
+    "Distance in DAG",
     "No. of GO 1 properties",
     "No. of GO 2 properties",
     "No. of common properties",
-    "Common %",
     "Intensional Difference (GO1 GO2)",
     "Intensional Difference (GO2 GO1)",
     "Intensional Similarity",
@@ -336,14 +353,15 @@ def compare():
   for pair in go_pairs:
     go1 = pair[0]
     go2 = pair[1]
+    go1_depth = go_dag[go1].depth if go_dag.get(go1) else "NA"
+    go2_depth = go_dag[go2].depth if go_dag.get(go2) else "NA"
+    dag_dist = dag_distance(go1, go2)
     go1_properties = get_properties(ConceptNode(go1))
     go2_properties = get_properties(ConceptNode(go2))
     go1_pattern_size = len(go1_properties)
     go2_pattern_size = len(go2_properties)
     common_properties = set(go1_properties).intersection(go2_properties)
     common_pattern_size = len(common_properties)
-    average_size = (go1_pattern_size + go2_pattern_size) / 2
-    common_percent = (common_pattern_size / average_size) * 100 if average_size > 0 else 0
     # PLN intensional difference
     intdiff_go1_go2_tv = intensional_difference(go1, go2)
     intdiff_go1_go2_tv_mean = intdiff_go1_go2_tv.mean if intdiff_go1_go2_tv.confidence > 0 else 0
@@ -358,10 +376,12 @@ def compare():
     row = ",".join([
       go1,
       go2,
+      str(go1_depth),
+      str(go2_depth),
+      str(dag_dist),
       str(go1_pattern_size),
       str(go2_pattern_size),
       str(common_pattern_size),
-      str(common_percent),
       str(intdiff_go1_go2_tv_mean),
       str(intdiff_go2_go1_tv_mean),
       str(intsim_tv_mean),
