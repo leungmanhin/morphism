@@ -352,6 +352,8 @@ infer_subsets_and_members()
 calculate_truth_values()
 infer_attractions()
 export_all_atoms()
+# XXX: Workaround the issue of getting SubsetLinks as well when only InheritanceLinks are expected
+[atomspace.remove(s) for s in atomspace.get_atoms_by_type(types.SubsetLink)]
 train_deepwalk_model()
 export_deepwalk_model()
 # plot_pca()
