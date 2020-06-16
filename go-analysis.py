@@ -277,7 +277,8 @@ def compare():
     if node_pattern_dict.get(node):
       return node_pattern_dict[node]
     else:
-      pats = [x.out[1] for x in get_attractions(node)]
+      attractions = list(filter(lambda x : x.tv.mean > 0, get_attractions(node)))
+      pats = [x.out[1] for x in attractions]
       node_pattern_dict[node] = pats
     return pats
 
