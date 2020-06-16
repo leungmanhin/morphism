@@ -303,6 +303,7 @@ def compare():
     "No. of GO 1 properties",
     "No. of GO 2 properties",
     "No. of common properties",
+    "Common %",
     "Intensional Difference (GO1 GO2)",
     "Intensional Difference (GO2 GO1)",
     "Intensional Similarity",
@@ -319,6 +320,8 @@ def compare():
     go2_pattern_size = len(go2_properties)
     common_properties = set(go1_properties).intersection(go2_properties)
     common_pattern_size = len(common_properties)
+    average_size = (go1_pattern_size + go2_pattern_size) / 2
+    common_percent = (common_pattern_size / average_size) * 100 if average_size > 0 else 0
     # PLN intensional difference
     intdiff_go1_go2_tv = intensional_difference(go1, go2)
     intdiff_go1_go2_tv_mean = intdiff_go1_go2_tv.mean if intdiff_go1_go2_tv.confidence > 0 else 0
@@ -336,6 +339,7 @@ def compare():
       str(go1_pattern_size),
       str(go2_pattern_size),
       str(common_pattern_size),
+      str(common_percent),
       str(intdiff_go1_go2_tv_mean),
       str(intdiff_go2_go1_tv_mean),
       str(intsim_tv_mean),
