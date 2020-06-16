@@ -204,8 +204,6 @@ def train_deepwalk_model():
 
   def add_to_next_words_dict(w, nw):
     if next_words_dict.get(w):
-      if isinstance(next_words_dict[w], list):
-        next_words_dict[w] = set(next_words_dict[w])
       next_words_dict[w].add(nw)
     else:
       next_words_dict[w] = {nw}
@@ -219,8 +217,6 @@ def train_deepwalk_model():
     rev_pred = "geneontologyterm-inherited-by"
     add_to_next_words_dict(child, (pred, parent))
     add_to_next_words_dict(parent, (rev_pred, child))
-  for k, v in next_words_dict.items():
-    next_words_dict[k] = list(v)
 
   memblinks = atomspace.get_atoms_by_type(types.MemberLink)
   for memblink in memblinks:
@@ -230,6 +226,7 @@ def train_deepwalk_model():
     rev_pred = "has-gene-ontology-member"
     add_to_next_words_dict(child, (pred, parent))
     add_to_next_words_dict(parent, (rev_pred, child))
+
   for k, v in next_words_dict.items():
     next_words_dict[k] = list(v)
 
