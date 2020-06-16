@@ -39,11 +39,8 @@ go_dag = obo_parser.GODag(go_basic_obo)
 def scm(atomese):
   return scheme_eval(atomspace, atomese).decode("utf-8")
 
-def get_concepts(name_prefix):
-  return list(
-           filter(
-             lambda x : x.name.startswith(name_prefix),
-             atomspace.get_atoms_by_type(types.ConceptNode)))
+def get_concepts(str_prefix):
+  return [x for x in atomspace.get_atoms_by_type(types.ConceptNode) if x.name.startswith(str_prefix)]
 
 def intensional_difference(c1, c2):
   cn1 = "(Concept \"{}\")".format(c1)
@@ -149,8 +146,7 @@ def calculate_truth_values():
     if node_member_dict.get(node):
       return node_member_dict[node]
     else:
-      memblinks = filter(lambda x : x.type == types.MemberLink and x.out[1] == node, node.incoming)
-      members = [x.out[0] for x in tuple(memblinks)]
+      members = [x.out[0] for x in node.incoming if x.type == types.MemberLink and x.out[1] == node]
       node_member_dict[node] = members
       return members
 
@@ -297,14 +293,12 @@ def compare():
   node_pattern_dict = {}
   def get_properties(node):
     def get_attractions(node):
-      return list(
-               filter(
-                 lambda x : x.type == types.AttractionLink and x.out[0] == node,
-                 node.incoming))
+      return [x for x in node.incoming if x.type == types.AttractionLink and x.out[0] == node]
     if node_pattern_dict.get(node):
       return node_pattern_dict[node]
     else:
-      attractions = list(filter(lambda x : x.tv.mean > 0, get_attractions(node)))
+      # Filter out the ones with mean == 0
+      attractions = [x for x in get_attractions(node) if x.tv.mean > 0]
       pats = [x.out[1] for x in attractions]
       node_pattern_dict[node] = pats
     return pats
