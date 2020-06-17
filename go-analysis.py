@@ -1,3 +1,4 @@
+import csv
 import os
 import pickle
 import random
@@ -11,6 +12,7 @@ from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
+from scipy.stats import kendalltau, pearsonr, spearmanr
 from sklearn.decomposition import PCA
 
 log.set_level("ERROR")
@@ -368,7 +370,10 @@ def compare():
     "Intensional Difference (GO1 GO2)",
     "Intensional Difference (GO2 GO1)",
     "Intensional Similarity",
-    "Vector distance"])
+    "Vector distance",
+    "Pearson",
+    "Spearman",
+    "Kendall"])
   results_csv_fp.write(first_row + "\n")
 
   # Generate the results
@@ -395,6 +400,7 @@ def compare():
     v1 = deepwalk[go1]
     v2 = deepwalk[go2]
     vec_dist = distance.euclidean(v1, v2)
+    # The complete row
     row = ",".join([
       go1,
       go2,
@@ -409,6 +415,38 @@ def compare():
       str(intsim_tv_mean),
       str(vec_dist)])
     results_csv_fp.write(row + "\n")
+  results_csv_fp.close()
+
+  # For correlations
+  csv_reader = csv.reader(open(results_csv))
+  intsim_col_idx = first_row.split(",").index("Intensional Similarity")
+  vecdist_col_idx = first_row.split(",").index("Vector distance")
+  # Skip the first row (column names) before sorting the floats
+  next(csv_reader)
+  sorted_results = sorted(csv_reader, key=lambda row: float(row[intsim_col_idx]), reverse=True)
+
+  results_csv_fp = open(results_csv, "w")
+  results_csv_fp.write(first_row + "\n")
+
+  intsim_n = []
+  vecdist_n = []
+
+  for row in sorted_results:
+    intsim_n.append(float(row[intsim_col_idx]))
+    vecdist_n.append(float(row[vecdist_col_idx]))
+
+    if len(intsim_n) >= 10:
+      pearson = pearsonr(intsim_n, vecdist_n)[0]
+      spearman = spearmanr(intsim_n, vecdist_n)[0]
+      kendall = kendalltau(intsim_n, vecdist_n)[0]
+    else:
+      pearson = "-"
+      spearman = "-"
+      kendall = "-"
+
+    new_row = ",".join([",".join(row), ",".join([str(pearson), str(spearman), str(kendall)])])
+    results_csv_fp.write(new_row + "\n")
+
   results_csv_fp.close()
 
 ### Main ###
