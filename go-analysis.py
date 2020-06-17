@@ -225,6 +225,7 @@ def infer_attractions():
 
 def train_deepwalk_model():
   global deepwalk
+  go_terms_involved = set()
   next_words_dict = {}
   sentences = []
 
@@ -235,6 +236,21 @@ def train_deepwalk_model():
       next_words_dict[w] = {nw}
 
   print("--- Gathering next words")
+  for subset in atomspace.get_atoms_by_type(types.SubsetLink):
+    tv = subset.tv
+    # Only look at the ones loaded directly from data, i.e. having (stv 1 1),
+    # and excluded the inferred ones
+    if tv.mean == 1 and tv.confidence == 1:
+      child = subset.out[0].name
+      parent = subset.out[1].name
+      pred = "inherits-geneontologyterm"
+      rev_pred = "geneontologyterm-inherited-by"
+      add_to_next_words_dict(child, (pred, parent))
+      add_to_next_words_dict(parent, (rev_pred, child))
+      go_terms_involved.add(child)
+      go_terms_involved.add(parent)
+
+  '''
   inhlinks = atomspace.get_atoms_by_type(types.InheritanceLink)
   for inhlink in inhlinks:
     child = inhlink.out[0].name
@@ -252,14 +268,15 @@ def train_deepwalk_model():
     rev_pred = "has-gene-ontology-member"
     add_to_next_words_dict(child, (pred, parent))
     add_to_next_words_dict(parent, (rev_pred, child))
+  '''
 
   for k, v in next_words_dict.items():
     next_words_dict[k] = list(v)
 
   print("--- Generating sentences")
   num_sentences = 10000000
-  num_walks = 7
-  first_words = [x.name for x in get_concepts(go_term_prefix)]
+  num_walks = 15
+  first_words = tuple(go_terms_involved)
   for i in range(num_sentences):
     sentence = [random.choice(first_words)]
     for j in range(num_walks):
@@ -290,6 +307,17 @@ def plot_pca():
 def compare():
   print("--- Comparing PLN vs DW")
 
+  def get_go_terms_in_hierarchy():
+    go_terms = set()
+    for subset in atomspace.get_atoms_by_type(types.SubsetLink):
+      tv = subset.tv
+      # Only look at the ones loaded directly from data, i.e. having (stv 1 1),
+      # and excluded the inferred ones
+      if tv.mean == 1 and tv.confidence == 1:
+        go_terms.add(subset.out[0].name)
+        go_terms.add(subset.out[1].name)
+    return list(go_terms)
+
   node_pattern_dict = {}
   def get_properties(node):
     def get_attractions(node):
@@ -315,7 +343,7 @@ def compare():
 
   # Get the user pairs
   print("--- Generating GO term pairs")
-  gos = [x.name for x in get_concepts(go_term_prefix)]
+  gos = get_go_terms_in_hierarchy()
   random.shuffle(gos)
   go_pairs = list(zip(gos[::2], gos[1::2]))
 
