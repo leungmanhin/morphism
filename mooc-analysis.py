@@ -10,17 +10,20 @@ from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
 from sklearn.decomposition import PCA
 
-mooc_actions_tsv = os.getcwd() + "/datasets/mooc_actions.tsv"
-mooc_action_labels_tsv = os.getcwd() + "/datasets/mooc_action_labels.tsv"
-mooc_action_features_tsv = os.getcwd() + "/datasets/mooc_action_features.tsv"
-member_links_scm = os.getcwd() + "/results/member-links.scm"
-evaluation_links_scm = os.getcwd() + "/results/evaluation-links.scm"
-subset_links_scm = os.getcwd() + "/results/subset-links.scm"
-attraction_links_scm = os.getcwd() + "/results/attraction-links.scm"
-sentences_pickle = os.getcwd() + "/results/sentences.pickle"
-deepwalk_bin = os.getcwd() + "/results/deepwalk.bin"
-pca_png = os.getcwd() + "/results/pca.png"
-results_csv = os.getcwd() + "/results/results.csv"
+base_datasets_dir = os.getcwd() + "/datasets/"
+base_results_dir = os.getcwd() + "/results/mooc/"
+
+mooc_actions_tsv = base_datasets_dir + "mooc_actions.tsv"
+mooc_action_labels_tsv = base_datasets_dir + "mooc_action_labels.tsv"
+mooc_action_features_tsv = base_datasets_dir + "mooc_action_features.tsv"
+member_links_scm = base_results_dir + "member-links.scm"
+evaluation_links_scm = base_results_dir + "evaluation-links.scm"
+subset_links_scm = base_results_dir + "subset-links.scm"
+attraction_links_scm = base_results_dir + "attraction-links.scm"
+sentences_pickle = base_results_dir + "sentences.pickle"
+deepwalk_bin = base_results_dir + "deepwalk.bin"
+pca_png = base_results_dir + "pca.png"
+results_csv = base_results_dir + "results.csv"
 
 course_id_prefix = "course:"
 user_id_prefix = "user:"
