@@ -203,6 +203,53 @@ def infer_attractions():
                   "#:maximum-iterations 12",
                   "#:complexity-penalty 10)"]))
 
+def train_deepwalk_model():
+  global deepwalk
+  next_words_dict = {}
+  sentences = []
+
+  def add_to_next_words_dict(w, nw):
+    if next_words_dict.get(w):
+      next_words_dict[w].add(nw)
+    else:
+      next_words_dict[w] = {nw}
+
+  def get_reverse_pred(pred):
+    if pred == "has_property":
+      return "is_a_property_of"
+
+  print("--- Gathering next words")
+  evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
+  for evalink in evalinks:
+    pred = evalink.out[0].name
+    rev_pred = get_reverse_pred(pred)
+    source = evalink.out[1].out[0].name
+    target = evalink.out[1].out[1].name
+    add_to_next_words_dict(source, (pred, target))
+    add_to_next_words_dict(target, (rev_pred, source))
+  for k, v in next_words_dict.items():
+    next_words_dict[k] = tuple(v)
+
+  print("--- Generating sentences")
+  num_sentences = 10000000
+  num_walks = 9
+  first_words = [x.name for x in get_concepts(person_prefix)]
+  for i in range(num_sentences):
+    sentence = [random.choice(first_words)]
+    for j in range(sentence_length):
+      last_word = sentence[-1]
+      next_words = random.choice(next_words_dict.get(last_word))
+      sentence.append(next_words[0])
+      sentence.append(next_words[1])
+    sentences.append(sentence)
+    if len(sentences) % 10000 == 0:
+      print(len(sentences))
+  with open(sentences_pickle, "wb") as f:
+    pickle.dump(sentences, f)
+
+  print("--- Training model")
+  deepwalk = Word2Vec(sentences, min_count=1)
+
 ### Main ###
 # load_all_atomes()
 # load_deepwalk_model()
@@ -212,7 +259,7 @@ generate_subsets()
 calculate_truth_values()
 infer_attractions()
 export_all_atoms()
-# train_deepwalk_model()
-# export_deepwalk_model()
+train_deepwalk_model()
+export_deepwalk_model()
 # plot_pca()
 # compare()
