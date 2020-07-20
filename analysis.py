@@ -128,12 +128,20 @@ def populate_atomspace():
           person_conceptnode,
           property_conceptnode))
 
+def generate_subsets():
+  print("--- Generating SubsetLinks")
+  for evalink in atomspace.get_atoms_by_type(types.EvaluationLink):
+    source = evalink.out[1].out[0]
+    target = evalink.out[1].out[1]
+    SubsetLink(source, target)
+    SubsetLink(target, source)
+
 ### Main ###
 # load_all_atomes()
 # load_deepwalk_model()
 
 populate_atomspace()
-# generate_subsets()
+generate_subsets()
 # calculate_truth_values()
 # infer_attractions()
 # export_all_atoms()
