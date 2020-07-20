@@ -250,16 +250,99 @@ def train_deepwalk_model():
   print("--- Training model")
   deepwalk = Word2Vec(sentences, min_count=1)
 
-### Main ###
-# load_all_atomes()
-# load_deepwalk_model()
+def plot_pca():
+  print("--- Plotting")
+  X = deepwalk[deepwalk.wv.vocab]
+  pca = PCA(n_components = 2)
+  result = pca.fit_transform(X)
+  pyplot.scatter(result[:, 0], result[:, 1])
+  words = list(deepwalk.wv.vocab)
+  for i, word in enumerate(words):
+    pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
+  pyplot.savefig(pca_png, dpi=1000)
 
-populate_atomspace()
-generate_subsets()
-calculate_truth_values()
-infer_attractions()
-export_all_atoms()
-train_deepwalk_model()
-export_deepwalk_model()
+def compare():
+  print("--- Comparing PLN vs DW")
+
+  node_pattern_dict = {}
+  def get_properties(node):
+    def get_attractions(node):
+      return [x for x in node.incoming if x.type == types.AttractionLink and x.out[0] == node]
+    if node_pattern_dict.get(node):
+      return node_pattern_dict[node]
+    else:
+      pats = [x.out[1] for x in get_attractions(node)]
+      node_pattern_dict[node] = pats
+    return pats
+
+  # Get the pairs
+  print("--- Generating pairs")
+  people = [x.name for x in get_concepts(person_prefix)]
+  random.shuffle(people)
+  people_pairs = list(zip(people[::2], people[1::2]))
+
+  print("--- Generating results")
+  # PLN setup
+  scm("(pln-load 'empty)")
+  scm("(pln-load-from-path \"rules/intensional-difference-direct-introduction-mooc.scm\")")
+  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule-mooc\")")
+  scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
+
+  # Output file
+  results_csv_fp = open(results_csv, "w")
+  first_row = ",".join([
+    "Person 1",
+    "Person 2",
+    "No. of person 1 properties",
+    "No. of person 2 properties",
+    "No. of common properties",
+    "Intensional Difference (U1 U2)",
+    "Intensional Difference (U2 U1)",
+    "Intensional Similarity",
+    "Vector distance"])
+  results_csv_fp.write(first_row + "\n")
+
+  # Generate the results
+  for pair in people_pairs:
+    p1 = pair[0]
+    p2 = pair[1]
+    p1_properties = get_properties(ConceptNode(p1))
+    p2_properties = get_properties(ConceptNode(p2))
+    p1_pattern_size = len(p1_properties)
+    p2_pattern_size = len(p2_properties)
+    common_properties = set(p1_properties).intersection(p2_properties)
+    common_pattern_size = len(common_properties)
+    # PLN intensional difference
+    intdiff_p1_p2_tv = intensional_difference(p1, p2).mean
+    intdiff_p2_p1_tv = intensional_difference(p2, p1).mean
+    intsim_tv = intensional_similarity(p1, p2).mean
+    # DeepWalk euclidean distance
+    v1 = deepwalk[p1]
+    v2 = deepwalk[p2]
+    vec_dist = distance.euclidean(v1, v2)
+    row = ",".join([
+      p1,
+      p2,
+      str(p1_pattern_size),
+      str(p2_pattern_size),
+      str(common_pattern_size),
+      str(intdiff_p1_p2_tv),
+      str(intdiff_p2_p1_tv),
+      str(intsim_tv),
+      str(vec_dist)])
+    results_csv_fp.write(row + "\n")
+  results_csv_fp.close()
+
+### Main ###
+load_all_atomes()
+load_deepwalk_model()
+
+# populate_atomspace()
+# generate_subsets()
+# calculate_truth_values()
+# infer_attractions()
+# export_all_atoms()
+# train_deepwalk_model()
+# export_deepwalk_model()
 # plot_pca()
-# compare()
+compare()
