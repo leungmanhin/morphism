@@ -103,7 +103,7 @@ def populate_atomspace():
   print("--- Populating the AtomSpace")
 
   num_people = 10
-  num_properties = 1000
+  num_properties = 20
   num_properties_per_person = 10
 
   # Create people and the properties linked with them
@@ -136,13 +136,64 @@ def generate_subsets():
     SubsetLink(source, target)
     SubsetLink(target, source)
 
+def calculate_truth_values():
+  print("--- Calculating Truth Values")
+
+  node_member_dict = {}
+  def get_members(node):
+    if node_member_dict.get(node):
+      return node_member_dict[node]
+    else:
+      memblinks = [x for x in node.incoming if x.type == types.MemberLink and x.out[1] == node]
+      members = [x.out[0] for x in tuple(memblinks)]
+      node_member_dict[node] = members
+      return members
+
+  def get_confidence(count):
+    return float(scm("(count->confidence " + str(count) + ")"))
+
+  # EvaluationLinks are generated directly from the data, can be considered as true
+  for e in atomspace.get_atoms_by_type(types.EvaluationLink):
+    e.tv = TruthValue(1, 1)
+
+  # MemberLinks are generated directly from the data, can be considered as true
+  for m in atomspace.get_atoms_by_type(types.MemberLink):
+    m.tv = TruthValue(1, 1)
+
+  # ConceptNode "A" (stv s c)
+  # where:
+  # s = |A| / |universe|
+  # c = |universe|
+  universe_size = len(get_concepts(subuniverse_prefix))
+  tv_confidence = get_confidence(universe_size)
+  for c in atomspace.get_atoms_by_type(types.ConceptNode):
+    member_size = len(get_members(c))
+    tv_strength = member_size / universe_size
+    c.tv = TruthValue(tv_strength, tv_confidence)
+
+  # SubsetLink (stv s c)
+  #   A
+  #   B
+  # where:
+  # s = |B intersect A| / |A|
+  # c = |A|
+  for s in atomspace.get_atoms_by_type(types.SubsetLink):
+    node1 = s.out[0]
+    node2 = s.out[1]
+    node1_members = get_members(node1)
+    node2_members = get_members(node2)
+    common_members = set(node2_members).intersection(node1_members)
+    tv_strength = len(common_members) / len(node1_members)
+    tv_confidence = get_confidence(len(node1_members))
+    s.tv = TruthValue(tv_strength, tv_confidence)
+
 ### Main ###
 # load_all_atomes()
 # load_deepwalk_model()
 
 populate_atomspace()
 generate_subsets()
-# calculate_truth_values()
+calculate_truth_values()
 # infer_attractions()
 # export_all_atoms()
 # train_deepwalk_model()
