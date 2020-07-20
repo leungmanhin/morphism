@@ -106,7 +106,7 @@ def populate_atomspace():
   num_properties = 20
   num_properties_per_person = 10
 
-  # Create people and the properties linked with them
+  # Create people and the properties linked to them
   for i in range(0, num_people):
     subuniverse_conceptnode = ConceptNode(subuniverse_prefix + str(i))
     person_conceptnode = ConceptNode(person_prefix + str(i))
@@ -187,6 +187,22 @@ def calculate_truth_values():
     tv_confidence = get_confidence(len(node1_members))
     s.tv = TruthValue(tv_strength, tv_confidence)
 
+def infer_attractions():
+  print("--- Inferring AttractionLinks")
+  scm("(pln-load 'empty)")
+  # (Subset A B) |- (Subset (Not A) B)
+  scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+  # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
+  scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
+  scm(" ".join(["(pln-bc",
+                  "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
+                  "#:vardecl",
+                    "(VariableSet",
+                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                  "#:maximum-iterations 12",
+                  "#:complexity-penalty 10)"]))
+
 ### Main ###
 # load_all_atomes()
 # load_deepwalk_model()
@@ -194,8 +210,8 @@ def calculate_truth_values():
 populate_atomspace()
 generate_subsets()
 calculate_truth_values()
-# infer_attractions()
-# export_all_atoms()
+infer_attractions()
+export_all_atoms()
 # train_deepwalk_model()
 # export_deepwalk_model()
 # plot_pca()
