@@ -207,7 +207,7 @@ def calculate_truth_values():
     if node_member_dict.get(node):
       return node_member_dict[node]
     else:
-      memblinks = [x for x in node.incoming if x.type == types.MemberLink and x.out[1] == mode]
+      memblinks = [x for x in node.incoming if x.type == types.MemberLink and x.out[1] == node]
       members = [x.out[0] for x in tuple(memblinks)]
       node_member_dict[node] = members
       return members
