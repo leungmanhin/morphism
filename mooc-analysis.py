@@ -305,7 +305,7 @@ def train_deepwalk_model():
   first_words = [x.name for x in get_concepts(user_id_prefix)]
   for i in range(num_sentences):
     sentence = [random.choice(first_words)]
-    for j in range(sentence_length):
+    for j in range(num_walks):
       last_word = sentence[-1]
       next_words = random.choice(next_words_dict.get(last_word))
       sentence.append(next_words[0])
