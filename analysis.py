@@ -120,7 +120,7 @@ def populate_atomspace():
 
       MemberLink(
         subuniverse_conceptnode,
-        person_conceptnode)
+        property_conceptnode)
 
       EvaluationLink(
         PredicateNode("has_property"),
