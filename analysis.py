@@ -1,3 +1,4 @@
+import csv
 import os
 import pickle
 import random
@@ -8,6 +9,7 @@ from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
+from scipy.stats import kendalltau, pearsonr, spearmanr
 from sklearn.decomposition import PCA
 
 base_results_dir = os.getcwd() + "/results/"
@@ -278,8 +280,11 @@ def compare():
   # Get the pairs
   print("--- Generating pairs")
   people = [x.name for x in get_concepts(person_prefix)]
-  random.shuffle(people)
-  people_pairs = list(zip(people[::2], people[1::2]))
+  people_pairs = []
+  for person1 in people:
+    for person2 in people:
+      if person1 != person2:
+        people_pairs.append((person1, person2))
 
   print("--- Generating results")
   # PLN setup
@@ -331,6 +336,38 @@ def compare():
       str(intsim_tv),
       str(vec_dist)])
     results_csv_fp.write(row + "\n")
+  results_csv_fp.close()
+
+  # For correlations
+  csv_reader = csv.reader(open(results_csv))
+  intsim_col_idx = first_row.split(",").index("Intensional Similarity")
+  vecdist_col_idx = first_row.split(",").index("Vector distance")
+  # Skip the first row (column names) before sorting the floats
+  next(csv_reader)
+  sorted_results = sorted(csv_reader, key=lambda row: float(row[intsim_col_idx]), reverse=True)
+
+  results_csv_fp = open(results_csv, "w")
+  results_csv_fp.write(first_row + "\n")
+
+  intsim_n = []
+  vecdist_n = []
+
+  for row in sorted_results:
+    intsim_n.append(float(row[intsim_col_idx]))
+    vecdist_n.append(float(row[vecdist_col_idx]))
+
+    if len(intsim_n) >= 10:
+      pearson = pearsonr(intsim_n, vecdist_n)[0]
+      spearman = spearmanr(intsim_n, vecdist_n)[0]
+      kendall = kendalltau(intsim_n, vecdist_n)[0]
+    else:
+      pearson = "-"
+      spearman = "-"
+      kendall = "-"
+
+    new_row = ",".join([",".join(row), ",".join([str(pearson), str(spearman), str(kendall)])])
+    results_csv_fp.write(new_row + "\n")
+
   results_csv_fp.close()
 
 ### Main ###
