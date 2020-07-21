@@ -292,8 +292,7 @@ def compare():
   print("--- Generating results")
   # PLN setup
   scm("(pln-load 'empty)")
-  scm("(pln-load-from-path \"rules/intensional-difference-direct-introduction-mooc.scm\")")
-  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule-mooc\")")
+  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule\")")
   scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
 
   # Output file
@@ -321,9 +320,9 @@ def compare():
     common_properties = set(p1_properties).intersection(p2_properties)
     common_pattern_size = len(common_properties)
     # PLN intensional difference
-    intdiff_p1_p2_tv = intensional_difference(p1, p2).mean
-    intdiff_p2_p1_tv = intensional_difference(p2, p1).mean
-    intsim_tv = intensional_similarity(p1, p2).mean
+    intdiff_p1_p2_tv = intensional_difference(p1, p2).mean if intensional_difference(p1, p2).confidence > 0 else 0
+    intdiff_p2_p1_tv = intensional_difference(p2, p1).mean if intensional_difference(p2, p1).confidence > 0 else 0
+    intsim_tv = intensional_similarity(p1, p2).mean if intensional_similarity(p1, p2).confidence > 0 else 0
     # DeepWalk euclidean distance
     v1 = deepwalk[p1]
     v2 = deepwalk[p2]
