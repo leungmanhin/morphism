@@ -45,15 +45,6 @@ def scm(atomese):
 def get_concepts(str_prefix):
   return [x for x in atomspace.get_atoms_by_type(types.ConceptNode) if x.name.startswith(str_prefix)]
 
-def intensional_difference(c1, c2):
-  cn1 = "(Concept \"{}\")".format(c1)
-  cn2 = "(Concept \"{}\")".format(c2)
-  intdiff = "(IntensionalDifference {} {})".format(cn1, cn2)
-  scm("(pln-bc {})".format(intdiff))
-  tv_mean = float(scm("(cog-mean {})".format(intdiff)))
-  tv_conf = float(scm("(cog-confidence {})".format(intdiff)))
-  return TruthValue(tv_mean, tv_conf)
-
 def intensional_similarity(c1, c2):
   cn1 = "(Concept \"{}\")".format(c1)
   cn2 = "(Concept \"{}\")".format(c2)
@@ -292,7 +283,6 @@ def compare():
   print("--- Generating results")
   # PLN setup
   scm("(pln-load 'empty)")
-  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule\")")
   scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
 
   # Output file
@@ -303,8 +293,6 @@ def compare():
     "No. of person 1 properties",
     "No. of person 2 properties",
     "No. of common properties",
-    "Intensional Difference (U1 U2)",
-    "Intensional Difference (U2 U1)",
     "Intensional Similarity",
     "Vector distance"])
   results_csv_fp.write(first_row + "\n")
@@ -319,9 +307,7 @@ def compare():
     p2_pattern_size = len(p2_properties)
     common_properties = set(p1_properties).intersection(p2_properties)
     common_pattern_size = len(common_properties)
-    # PLN intensional difference
-    intdiff_p1_p2_tv = intensional_difference(p1, p2).mean if intensional_difference(p1, p2).confidence > 0 else 0
-    intdiff_p2_p1_tv = intensional_difference(p2, p1).mean if intensional_difference(p2, p1).confidence > 0 else 0
+    # PLN intensional similarity
     intsim_tv = intensional_similarity(p1, p2).mean if intensional_similarity(p1, p2).confidence > 0 else 0
     # DeepWalk euclidean distance
     v1 = deepwalk[p1]
@@ -333,8 +319,6 @@ def compare():
       str(p1_pattern_size),
       str(p2_pattern_size),
       str(common_pattern_size),
-      str(intdiff_p1_p2_tv),
-      str(intdiff_p2_p1_tv),
       str(intsim_tv),
       str(vec_dist)])
     results_csv_fp.write(row + "\n")
@@ -373,15 +357,15 @@ def compare():
   results_csv_fp.close()
 
 ### Main ###
-load_all_atomes()
-load_deepwalk_model()
+# load_all_atomes()
+# load_deepwalk_model()
 
-# populate_atomspace()
-# generate_subsets()
-# calculate_truth_values()
-# infer_attractions()
-# export_all_atoms()
-# train_deepwalk_model()
-# export_deepwalk_model()
-# plot_pca()
+populate_atomspace()
+generate_subsets()
+calculate_truth_values()
+infer_attractions()
+export_all_atoms()
+train_deepwalk_model()
+export_deepwalk_model()
+plot_pca()
 compare()
