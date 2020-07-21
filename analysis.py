@@ -32,6 +32,12 @@ property_prefix = "property:"
 
 deepwalk = None
 
+num_people = 10
+num_properties = 20
+num_properties_per_person = 10
+num_sentences = 10000000
+num_walks = 9
+
 ### Utils ###
 def scm(atomese):
   return scheme_eval(atomspace, atomese).decode("utf-8")
@@ -106,10 +112,6 @@ def export_deepwalk_model():
 ### Populate the AtomSpace ###
 def populate_atomspace():
   print("--- Populating the AtomSpace")
-
-  num_people = 10
-  num_properties = 20
-  num_properties_per_person = 10
 
   # Create people and the properties linked to them
   for i in range(0, num_people):
@@ -236,8 +238,6 @@ def train_deepwalk_model():
     next_words_dict[k] = tuple(v)
 
   print("--- Generating sentences")
-  num_sentences = 10000000
-  num_walks = 9
   first_words = [x.name for x in get_concepts(person_prefix)]
   for i in range(num_sentences):
     sentence = [random.choice(first_words)]
