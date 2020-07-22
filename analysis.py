@@ -314,7 +314,10 @@ def compare():
     "No. of person 2 properties",
     "No. of common properties",
     "Intensional Similarity",
-    "Vector distance"])
+    "Vector distance",
+    "Pearson",
+    "Spearman",
+    "Kendall"])
   results_csv_fp.write(first_row + "\n")
 
   # Generate the results
