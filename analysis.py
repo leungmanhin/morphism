@@ -5,6 +5,7 @@ import random
 from gensim.models import Word2Vec
 from matplotlib import pyplot
 from opencog.atomspace import AtomSpace, types
+from opencog.bindlink import execute_atom
 from opencog.logger import log
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
@@ -44,6 +45,25 @@ def scm(atomese):
 
 def get_concepts(str_prefix):
   return [x for x in atomspace.get_atoms_by_type(types.ConceptNode) if x.name.startswith(str_prefix)]
+
+def get_concepts_with_property(prop):
+  return execute_atom(atomspace,
+           GetLink(
+             EvaluationLink(
+               PredicateNode("has_property"),
+               ListLink(
+                 VariableNode("$X"),
+                 prop)))).out
+
+def print_property_prevalence():
+  property_cnt = 0
+  sum_prevalence = 0
+  for p in get_concepts(property_prefix):
+    prevalence = len(get_concepts_with_property(p))
+    property_cnt = property_cnt + 1
+    sum_prevalence = sum_prevalence + prevalence
+    print("{}, {}".format(p.name, prevalence))
+  print("Total no. of properties: {}\nAverage: {}".format(property_cnt, sum_prevalence/property_cnt))
 
 def intensional_similarity(c1, c2):
   cn1 = "(Concept \"{}\")".format(c1)
@@ -369,3 +389,5 @@ train_deepwalk_model()
 export_deepwalk_model()
 plot_pca()
 compare()
+
+print_property_prevalence()
