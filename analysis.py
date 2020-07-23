@@ -63,7 +63,11 @@ def print_property_prevalence():
     property_cnt = property_cnt + 1
     sum_prevalence = sum_prevalence + prevalence
     print("{}, {}".format(p.name, prevalence))
-  print("Total no. of properties: {}\nAverage: {}".format(property_cnt, sum_prevalence/property_cnt))
+  print("Total no. of people: {}\nTotal no. of properties: {}\nAverage property prevalence: {} ({}%)".format(
+      len(get_concepts(person_prefix)),
+      property_cnt,
+      sum_prevalence/property_cnt,
+      100 * sum_prevalence/property_cnt/num_people))
 
 def intensional_similarity(c1, c2):
   cn1 = "(Concept \"{}\")".format(c1)
