@@ -32,6 +32,7 @@ person_prefix = "person:"
 property_prefix = "property:"
 
 deepwalk = None
+property_vectors = []
 
 num_people = 10
 num_properties = 20
@@ -54,6 +55,15 @@ def get_concepts_with_property(prop):
                ListLink(
                  VariableNode("$X"),
                  prop)))).out
+
+def get_concept_properties(concept):
+  return execute_atom(atomspace,
+           GetLink(
+             EvaluationLink(
+               PredicateNode("has_property"),
+               ListLink(
+                 concept,
+                 VariableNode("$X"))))).out
 
 def print_property_prevalence():
   property_cnt = 0
@@ -270,6 +280,20 @@ def train_deepwalk_model():
   print("--- Training model")
   deepwalk = Word2Vec(sentences, min_count=1)
 
+def build_property_vectors():
+  global property_vectors
+  all_properties = get_concepts(property_prefix)
+
+  for person in get_concepts(person_prefix):
+    pvec = []
+    properties = get_concept_properties(person)
+    for p in all_properties:
+      if p in properties:
+        pvec.append(1)
+      else:
+        pvec.append(0)
+    property_vectors.append(pvec)
+
 def plot_pca():
   print("--- Plotting")
   X = deepwalk[deepwalk.wv.vocab]
@@ -392,6 +416,7 @@ generate_subsets()
 calculate_truth_values()
 infer_attractions()
 export_all_atoms()
+build_property_vectors()
 train_deepwalk_model()
 export_deepwalk_model()
 plot_pca()
