@@ -32,7 +32,7 @@ person_prefix = "person:"
 property_prefix = "property:"
 
 deepwalk = None
-property_vectors = []
+property_vector_dict = {}
 
 num_people = 10
 num_properties = 20
@@ -292,20 +292,19 @@ def build_property_vectors():
         pvec.append(1)
       else:
         pvec.append(0)
-    property_vectors.append(pvec)
+    property_vector_dict[person.name] = pvec
 
-def plot_pca():
+def plot_pca(X, labels):
   print("--- Plotting")
-  X = deepwalk[deepwalk.wv.vocab]
   pca = PCA(n_components = 2)
   result = pca.fit_transform(X)
   pyplot.scatter(result[:, 0], result[:, 1])
-  words = list(deepwalk.wv.vocab)
+  words = list(labels)
   for i, word in enumerate(words):
     pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
   pyplot.savefig(pca_png, dpi=1000)
 
-def compare():
+def compare(vec_dict):
   print("--- Comparing PLN vs DW")
 
   node_pattern_dict = {}
@@ -361,8 +360,8 @@ def compare():
     # PLN intensional similarity
     intsim_tv = intensional_similarity(p1, p2).mean if intensional_similarity(p1, p2).confidence > 0 else 0
     # DeepWalk euclidean distance
-    v1 = deepwalk[p1]
-    v2 = deepwalk[p2]
+    v1 = vec_dict[p1]
+    v2 = vec_dict[p2]
     vec_dist = distance.euclidean(v1, v2)
     row = ",".join([
       p1,
