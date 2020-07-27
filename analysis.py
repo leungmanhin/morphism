@@ -294,7 +294,7 @@ def build_property_vectors():
     properties = get_concept_properties(person)
     for p in all_properties:
       if p in properties:
-        pvec.append(fuzzy_membership_values[p])
+        pvec.append(fuzzy_membership_values[p.name])
       else:
         pvec.append(0)
     property_vector_dict[person.name] = pvec
@@ -424,4 +424,5 @@ def compare(embedding_method):
 def calculate_fuzzy_membership_values():
   global fuzzy_membership_values
   for p in get_concepts(property_prefix):
-    fuzzy_membership_values[p] = 1 - (len(get_people_with_property(p)) / num_people)
+    fuzzy_membership_values[p.name] = 1 - (len(get_people_with_property(p)) / num_people)
+    # print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
