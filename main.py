@@ -17,6 +17,7 @@ generate_subsets()
 calculate_truth_values()
 infer_attractions()
 export_all_atoms()
+calculate_fuzzy_membership_values()
 
 if embedding_method == "dw":
   train_deepwalk_model()

@@ -33,6 +33,7 @@ property_prefix = "property:"
 
 deepwalk = None
 property_vector_dict = {}
+fuzzy_membership_values = {}
 
 num_people = 100
 num_properties = 1000
@@ -47,7 +48,7 @@ def scm(atomese):
 def get_concepts(str_prefix):
   return [x for x in atomspace.get_atoms_by_type(types.ConceptNode) if x.name.startswith(str_prefix)]
 
-def get_concepts_with_property(prop):
+def get_people_with_property(prop):
   return execute_atom(atomspace,
            GetLink(
              EvaluationLink(
@@ -69,7 +70,7 @@ def print_property_prevalence():
   property_cnt = 0
   sum_prevalence = 0
   for p in get_concepts(property_prefix):
-    prevalence = len(get_concepts_with_property(p))
+    prevalence = len(get_people_with_property(p))
     property_cnt = property_cnt + 1
     sum_prevalence = sum_prevalence + prevalence
     print("{}, {}".format(p.name, prevalence))
@@ -289,8 +290,7 @@ def build_property_vectors():
     properties = get_concept_properties(person)
     for p in all_properties:
       if p in properties:
-        concepts_with_p = get_concepts_with_property(p)
-        pvec.append(1 - (len(concepts_with_p) / num_people))
+        pvec.append(fuzzy_membership_values[p])
       else:
         pvec.append(0)
     property_vector_dict[person.name] = pvec
@@ -416,3 +416,8 @@ def compare(embedding_method):
     results_csv_fp.write(new_row + "\n")
 
   results_csv_fp.close()
+
+def calculate_fuzzy_membership_values():
+  global fuzzy_membership_values
+  for p in get_concepts(property_prefix):
+    fuzzy_membership_values[p] = 1 - (len(get_people_with_property(p)) / num_people)
