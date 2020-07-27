@@ -1,3 +1,6 @@
+# To run:
+# python3 -B main.py
+
 from analysis import *
 
 # Different ways of building vectors are being explored, e.g.
