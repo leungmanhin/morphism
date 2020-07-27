@@ -290,7 +290,7 @@ def build_property_vectors():
     for p in all_properties:
       if p in properties:
         concepts_with_p = get_concepts_with_property(p)
-        pvec.append(1 - (len(concepts_with_p) / len(all_properties)))
+        pvec.append(1 - (len(concepts_with_p) / num_people))
       else:
         pvec.append(0)
     property_vector_dict[person.name] = pvec
