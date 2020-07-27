@@ -34,8 +34,8 @@ property_prefix = "property:"
 deepwalk = None
 property_vector_dict = {}
 
-num_people = 10
-num_properties = 20
+num_people = 100
+num_properties = 1000
 num_properties_per_person = 10
 num_sentences = 10000000
 num_walks = 9
@@ -295,8 +295,14 @@ def build_property_vectors():
         pvec.append(0)
     property_vector_dict[person.name] = pvec
 
-def plot_pca(X, labels):
+def plot_pca(embedding_method):
   print("--- Plotting")
+  if embedding_method == "dw":
+    X = deepwalk[deepwalk.wv.vocab]
+    labels = deepwalk.wv.vocab
+  elif embedding_method == "mb":
+    X = list(property_vector_dict.values())
+    labels = list(property_vector_dict.keys())
   pca = PCA(n_components = 2)
   result = pca.fit_transform(X)
   pyplot.scatter(result[:, 0], result[:, 1])
@@ -305,7 +311,7 @@ def plot_pca(X, labels):
     pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
   pyplot.savefig(pca_png, dpi=1000)
 
-def compare(vec_dict):
+def compare(embedding_method):
   print("--- Comparing PLN vs DW")
 
   node_pattern_dict = {}
@@ -361,8 +367,12 @@ def compare(vec_dict):
     # PLN intensional similarity
     intsim_tv = intensional_similarity(p1, p2).mean if intensional_similarity(p1, p2).confidence > 0 else 0
     # DeepWalk euclidean distance
-    v1 = vec_dict[p1]
-    v2 = vec_dict[p2]
+    if embedding_method == "dw":
+      v1 = deepwalk[p1]
+      v2 = deepwalk[p2]
+    elif embedding_method == "mb":
+      v1 = property_vector_dict[p1]
+      v2 = property_vector_dict[p2]
     vec_dist = distance.euclidean(v1, v2)
     row = ",".join([
       p1,

@@ -14,12 +14,12 @@ generate_subsets()
 calculate_truth_values()
 infer_attractions()
 export_all_atoms()
-# train_deepwalk_model()
-# export_deepwalk_model()
-# plot_pca(deepwalk[deepwalk.wv.vocab], deepwalk.wv.vocab)
-# compare(deepwalk)
 
-build_property_vectors()
-plot_pca(list(property_vector_dict.values()), list(property_vector_dict.keys()))
-compare(property_vector_dict)
-# print_property_prevalence()
+if embedding_method == "dw":
+  train_deepwalk_model()
+  export_deepwalk_model()
+elif embedding_method == "mb":
+  build_property_vectors()
+
+plot_pca(embedding_method)
+compare(embedding_method)
