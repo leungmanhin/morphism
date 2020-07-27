@@ -256,8 +256,12 @@ def train_deepwalk_model():
   for evalink in evalinks:
     pred = evalink.out[0].name
     rev_pred = get_reverse_pred(pred)
-    source = evalink.out[1].out[0].name
-    target = evalink.out[1].out[1].name
+    source_node = evalink.out[1].out[0]
+    target_node = evalink.out[1].out[1]
+    if source_node.type == types.VariableNode or target_node.type == types.VariableNode:
+      continue
+    source = source_node.name
+    target = target_node.name
     add_to_next_words_dict(source, (pred, target))
     add_to_next_words_dict(target, (rev_pred, source))
   for k, v in next_words_dict.items():
