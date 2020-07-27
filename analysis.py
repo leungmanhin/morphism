@@ -35,7 +35,7 @@ deepwalk = None
 property_vector_dict = {}
 fuzzy_membership_values = {}
 
-num_people = 100
+num_people = 1000
 num_properties = 1000
 num_properties_per_person = 10
 num_sentences = 10000000
@@ -262,8 +262,9 @@ def train_deepwalk_model():
       continue
     source = source_node.name
     target = target_node.name
-    add_to_next_words_dict(source, (pred, target))
-    add_to_next_words_dict(target, (rev_pred, source))
+    prob = fuzzy_membership_values[target]
+    add_to_next_words_dict(source, (pred, target, prob))
+    add_to_next_words_dict(target, (rev_pred, source, prob))
   for k, v in next_words_dict.items():
     next_words_dict[k] = tuple(v)
 
@@ -273,7 +274,10 @@ def train_deepwalk_model():
     sentence = [random.choice(first_words)]
     for j in range(num_walks):
       last_word = sentence[-1]
-      next_words = random.choice(next_words_dict.get(last_word))
+      candidates = next_words_dict.get(last_word)
+      phrases = [c[:2] for c in candidates]
+      probabilities = [c[2] for c in candidates]
+      next_words = random.choices(phrases, probabilities, k=1)[0]
       sentence.append(next_words[0])
       sentence.append(next_words[1])
     sentences.append(sentence)
@@ -332,11 +336,8 @@ def compare(embedding_method):
   # Get the pairs
   print("--- Generating pairs")
   people = [x.name for x in get_concepts(person_prefix)]
-  people_pairs = []
-  for person1 in people:
-    for person2 in people:
-      if person1 != person2:
-        people_pairs.append((person1, person2))
+  random.shuffle(people)
+  people_pairs = list(zip(people[::2], people[1::2]))
 
   print("--- Generating results")
   # PLN setup
@@ -425,4 +426,4 @@ def calculate_fuzzy_membership_values():
   global fuzzy_membership_values
   for p in get_concepts(property_prefix):
     fuzzy_membership_values[p.name] = 1 - (len(get_people_with_property(p)) / num_people)
-    # print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
+    print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
