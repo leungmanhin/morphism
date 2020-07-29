@@ -40,6 +40,7 @@ num_properties = 1000
 num_properties_per_person = 10
 num_sentences = 10000000
 num_walks = 9
+pca_components = 100
 
 ### Utils ###
 def scm(atomese):
@@ -307,6 +308,11 @@ def build_property_vectors():
       else:
         pvec.append(0)
     property_vector_dict[person.name] = pvec
+  # Do PCA for the sparse vectors
+  pca = PCA(n_components = pca_components)
+  pca_results = pca.fit_transform(list(property_vector_dict.values()))
+  for k, pca_v in zip(property_vector_dict.keys(), pca_results):
+    property_vector_dict[k] = pca_v
 
 def plot_pca(embedding_method):
   print("--- Plotting")
