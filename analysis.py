@@ -296,7 +296,7 @@ def train_deepwalk_model():
   print("--- Training model")
   deepwalk = Word2Vec(sentences, min_count=1)
 
-def build_property_vectors():
+def build_property_vectors(pca = False, ica = False):
   global property_vectors
   all_properties = get_concepts(property_prefix)
 
@@ -310,15 +310,17 @@ def build_property_vectors():
         pvec.append(0)
     property_vector_dict[person.name] = pvec
   # Do PCA for the sparse vectors
-  # pca = PCA(n_components = pca_components)
-  # pca_results = pca.fit_transform(list(property_vector_dict.values()))
-  # for k, pca_v in zip(property_vector_dict.keys(), pca_results):
-  #   property_vector_dict[k] = pca_v
+  if pca:
+    pca = PCA(n_components = pca_components)
+    pca_results = pca.fit_transform(list(property_vector_dict.values()))
+    for k, pca_v in zip(property_vector_dict.keys(), pca_results):
+      property_vector_dict[k] = pca_v
   # Do ICA for the sparse vectors
-  ica = FastICA(n_components = ica_components)
-  ica_results = ica.fit_transform(list(property_vector_dict.values()))
-  for k, ica_v in zip(property_vector_dict.keys(), ica_results):
-    property_vector_dict[k] = ica_v
+  if ica:
+    ica = FastICA(n_components = ica_components)
+    ica_results = ica.fit_transform(list(property_vector_dict.values()))
+    for k, ica_v in zip(property_vector_dict.keys(), ica_results):
+      property_vector_dict[k] = ica_v
 
 def plot_pca(embedding_method):
   print("--- Plotting")
