@@ -16,7 +16,7 @@ from sklearn.decomposition import PCA, FastICA
 
 log.set_level("ERROR")
 
-base_results_dir = os.getcwd() + "/results/toy"
+base_results_dir = os.getcwd() + "/results/toy/"
 
 member_links_scm = base_results_dir + "member-links.scm"
 evaluation_links_scm = base_results_dir + "evaluation-links.scm"
@@ -226,9 +226,9 @@ def infer_attractions():
   print("--- Inferring AttractionLinks")
   scm("(pln-load 'empty)")
   # (Subset A B) |- (Subset (Not A) B)
-  scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+  scm("(pln-add-rule \"subset-condition-negation-rule\")")
   # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
-  scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
+  scm("(pln-add-rule \"subset-attraction-introduction-rule\")")
   scm(" ".join(["(pln-bc",
                   "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
                   "#:vardecl",
@@ -368,7 +368,7 @@ def compare(embedding_method):
   print("--- Generating results")
   # PLN setup
   scm("(pln-load 'empty)")
-  scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
+  scm("(pln-add-rule \"intensional-similarity-direct-introduction-rule\")")
 
   # Output file
   results_csv_fp = open(results_csv, "w")

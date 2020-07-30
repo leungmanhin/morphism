@@ -120,11 +120,11 @@ def infer_subsets_and_members():
   scm("(pln-load-from-path \"rules/translation.scm\")")
   scm("(pln-load-from-path \"rules/transitivity.scm\")")
   # (Inheritance C1 C2) |- (Subset C1 C2)
-  scm("(pln-add-rule-by-name \"present-inheritance-to-subset-translation-rule\")")
+  scm("(pln-add-rule \"present-inheritance-to-subset-translation-rule\")")
   # (Subset C1 C2) (Subset C2 C3) |- (Subset C1 C3)
-  scm("(pln-add-rule-by-name \"present-subset-transitivity-rule\")")
+  scm("(pln-add-rule \"present-subset-transitivity-rule\")")
   # (Member G C1) (Subset C1 C2) |- (Member G C2)
-  scm("(pln-add-rule-by-name \"present-mixed-member-subset-transitivity-rule\")")
+  scm("(pln-add-rule \"present-mixed-member-subset-transitivity-rule\")")
   scm(" ".join([
     "(pln-fc",
       "(Inheritance (Variable \"$X\") (Variable \"$Y\"))",
@@ -213,9 +213,9 @@ def infer_attractions():
   print("--- Inferring AttractionLinks")
   scm("(pln-load 'empty)")
   # (Subset A B) |- (Subset (Not A) B)
-  scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+  scm("(pln-add-rule \"subset-condition-negation-rule\")")
   # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
-  scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
+  scm("(pln-add-rule \"subset-attraction-introduction-rule\")")
   scm(" ".join(["(pln-bc",
                   "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
                   "#:vardecl",
@@ -353,8 +353,8 @@ def compare():
   # PLN setup
   scm("(pln-load 'empty)")
   # TODO: Check the size of the universe
-  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule\")")
-  scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
+  scm("(pln-add-rule \"intensional-difference-direct-introduction-rule\")")
+  scm("(pln-add-rule \"intensional-similarity-direct-introduction-rule\")")
 
   # Output file
   results_csv_fp = open(results_csv, "w")

@@ -254,9 +254,9 @@ def infer_attractions():
   print("--- Inferring AttractionLinks")
   scm("(pln-load 'empty)")
   # (Subset A B) |- (Subset (Not A) B)
-  scm("(pln-add-rule-by-name \"subset-condition-negation-rule\")")
+  scm("(pln-add-rule \"subset-condition-negation-rule\")")
   # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
-  scm("(pln-add-rule-by-name \"subset-attraction-introduction-rule\")")
+  scm("(pln-add-rule \"subset-attraction-introduction-rule\")")
   scm(" ".join(["(pln-bc",
                   "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
                   "#:vardecl",
@@ -360,8 +360,8 @@ def compare():
   # PLN setup
   scm("(pln-load 'empty)")
   scm("(pln-load-from-path \"rules/intensional-difference-direct-introduction-mooc.scm\")")
-  scm("(pln-add-rule-by-name \"intensional-difference-direct-introduction-rule-mooc\")")
-  scm("(pln-add-rule-by-name \"intensional-similarity-direct-introduction-rule\")")
+  scm("(pln-add-rule \"intensional-difference-direct-introduction-rule-mooc\")")
+  scm("(pln-add-rule \"intensional-similarity-direct-introduction-rule\")")
 
   # Output file
   results_csv_fp = open(results_csv, "w")
