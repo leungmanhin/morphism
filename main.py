@@ -9,7 +9,7 @@ from analysis import *
 embedding_method = "mb"
 
 ### Main ###
-load_all_atomes()
+load_all_atoms()
 # load_deepwalk_model()
 
 # populate_atomspace()
@@ -24,7 +24,7 @@ if embedding_method == "dw":
   train_deepwalk_model()
   export_deepwalk_model()
 elif embedding_method == "mb":
-  build_property_vectors(ica=True)
+  build_property_vectors()
 
-plot_pca(embedding_method)
 compare(embedding_method)
+# plot_pca(embedding_method)

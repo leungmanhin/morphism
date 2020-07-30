@@ -107,7 +107,7 @@ scm(" ".join([
       "atoms)",
     "(close-port fp))"]))
 
-def load_all_atomes():
+def load_all_atoms():
   print("--- Loading Atoms from files")
   scm("(use-modules (opencog persist-file))")
   scm("(load-file \"" + member_links_scm + "\")")

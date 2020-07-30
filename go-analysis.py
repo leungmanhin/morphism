@@ -78,7 +78,7 @@ scm(" ".join([
       "atoms)",
     "(close-port fp))"]))
 
-def load_all_atomes():
+def load_all_atoms():
   print("--- Loading Atoms from files")
   scm("(load-file \"" + member_links_scm + "\")")
   scm("(load-file \"" + inheritance_links_scm + "\")")
@@ -450,7 +450,7 @@ def compare():
   results_csv_fp.close()
 
 ### Main ###
-# load_all_atomes()
+# load_all_atoms()
 # load_deepwalk_model()
 
 populate_atomspace()
