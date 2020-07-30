@@ -16,7 +16,7 @@ from sklearn.decomposition import PCA, FastICA
 
 log.set_level("ERROR")
 
-base_results_dir = os.getcwd() + "/results/"
+base_results_dir = os.getcwd() + "/results/toy"
 
 member_links_scm = base_results_dir + "member-links.scm"
 evaluation_links_scm = base_results_dir + "evaluation-links.scm"
