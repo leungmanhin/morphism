@@ -1,3 +1,4 @@
+import csv
 import os
 import pickle
 import random
@@ -8,6 +9,7 @@ from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
+from scipy.stats import kendalltau, pearsonr, spearmanr
 from sklearn.decomposition import PCA
 
 base_datasets_dir = os.getcwd() + "/datasets/"
@@ -344,12 +346,6 @@ def compare():
       node_pattern_dict[node] = pats
     return pats
 
-  def has_dropped_out(user):
-    u_cpt = "(Concept \"{}\")".format(user)
-    d_cpt = "(Concept \"dropped-out\")"
-    result = scm("(equal? (list) (cog-link 'AttractionLink {} {}))".format(u_cpt, d_cpt))
-    return result.strip() == "#f"
-
   # Get the user pairs
   print("--- Generating user pairs")
   users = [x.name for x in get_concepts(user_id_prefix)]
@@ -359,8 +355,6 @@ def compare():
   print("--- Generating results")
   # PLN setup
   scm("(pln-load 'empty)")
-  scm("(pln-load-from-path \"rules/intensional-difference-direct-introduction-mooc.scm\")")
-  scm("(pln-add-rule \"intensional-difference-direct-introduction-rule-mooc\")")
   scm("(pln-add-rule \"intensional-similarity-direct-introduction-rule\")")
 
   # Output file
@@ -368,32 +362,26 @@ def compare():
   first_row = ",".join([
     "User 1",
     "User 2",
-    "User 1 dropped out?",
-    "User 2 dropped out?",
     "No. of user 1 properties",
     "No. of user 2 properties",
     "No. of common properties",
-    "Intensional Difference (U1 U2)",
-    "Intensional Difference (U2 U1)",
     "Intensional Similarity",
-    "Vector distance"])
+    "Vector distance",
+    "Pearson",
+    "Spearman",
+    "Kendall"])
   results_csv_fp.write(first_row + "\n")
 
   # Generate the results
   for pair in user_pairs:
     u1 = pair[0]
     u2 = pair[1]
-    u1_dropout = has_dropped_out(u1)
-    u2_dropout = has_dropped_out(u2)
     u1_properties = get_properties(ConceptNode(u1))
     u2_properties = get_properties(ConceptNode(u2))
     u1_pattern_size = len(u1_properties)
     u2_pattern_size = len(u2_properties)
     common_properties = set(u1_properties).intersection(u2_properties)
     common_pattern_size = len(common_properties)
-    # PLN intensional difference
-    intdiff_u1_u2_tv = intensional_difference(u1, u2).mean
-    intdiff_u2_u1_tv = intensional_difference(u2, u1).mean
     intsim_tv = intensional_similarity(u1, u2).mean
     # DeepWalk euclidean distance
     v1 = deepwalk[u1]
@@ -402,16 +390,45 @@ def compare():
     row = ",".join([
       u1,
       u2,
-      str(u1_dropout),
-      str(u2_dropout),
       str(u1_pattern_size),
       str(u2_pattern_size),
       str(common_pattern_size),
-      str(intdiff_u1_u2_tv),
-      str(intdiff_u2_u1_tv),
       str(intsim_tv),
       str(vec_dist)])
     results_csv_fp.write(row + "\n")
+  results_csv_fp.close()
+
+  # For correlations
+  csv_reader = csv.reader(open(results_csv))
+  intsim_col_idx = first_row.split(",").index("Intensional Similarity")
+  vecdist_col_idx = first_row.split(",").index("Vector distance")
+  # Skip the first row (column names) before sorting the floats
+  next(csv_reader)
+  sorted_results = sorted(csv_reader, key=lambda row: float(row[intsim_col_idx]), reverse=True)
+
+  results_csv_fp = open(results_csv, "w")
+  results_csv_fp.write(first_row + "\n")
+
+  intsim_n = []
+  vecdist_n = []
+
+  for row in sorted_results:
+    intsim_n.append(float(row[intsim_col_idx]))
+    vecdist_n.append(float(row[vecdist_col_idx]))
+
+    if len(intsim_n) >= 10:
+      pearson = pearsonr(intsim_n, vecdist_n)[0]
+      spearman = spearmanr(intsim_n, vecdist_n)[0]
+      kendall = kendalltau(intsim_n, vecdist_n)[0]
+    else:
+      pearson = "-"
+      spearman = "-"
+      kendall = "-"
+
+    new_row = ",".join([",".join(row), ",".join([str(pearson), str(spearman), str(kendall)])])
+    results_csv_fp.write(new_row + "\n")
+
+  print("pearson = {}\nspearman = {}\nkendall = {}".format(pearson, spearman, kendall))
   results_csv_fp.close()
 
 ### Main ###
