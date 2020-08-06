@@ -169,6 +169,7 @@ def populate_atomspace():
         "\t(ConceptNode \"" + node1 + "\")",
         "\t(ConceptNode \"" + node2 + "\"))\n"])
 
+    dropout_users = []
     next(f)
     for line in f:
       content = line.split("\t")
@@ -190,8 +191,11 @@ def populate_atomspace():
       if action_id in dropout_action_ids:
         scm(memblink(course_name, "dropped-out"))
         scm(evalink("has", user_name, "dropped-out"))
-      else:
-        scm(memblink(course_name, "not-dropped-out"))
+        dropout_users.append(user_name)
+      scm(memblink(course_name, "not-dropped-out"))
+    for user in get_concepts(user_id_prefix):
+      user_name = user.name
+      if user_name not in dropout_users:
         scm(evalink("has", user_name, "not-dropped-out"))
 
 def generate_subsets():
