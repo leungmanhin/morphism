@@ -5,6 +5,7 @@ import random
 from gensim.models import Word2Vec
 from matplotlib import pyplot
 from opencog.atomspace import AtomSpace, types
+from opencog.bindlink import execute_atom
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
@@ -332,8 +333,8 @@ def plot_pca():
     pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
   pyplot.savefig(pca_png, dpi=1000)
 
-def compare():
-  print("--- Comparing PLN vs DW")
+def compare(embedding_method):
+  print("--- Comparing PLN vs " + embedding_method)
 
   node_pattern_dict = {}
   def get_properties(node):
@@ -383,9 +384,13 @@ def compare():
     common_properties = set(u1_properties).intersection(u2_properties)
     common_pattern_size = len(common_properties)
     intsim_tv = intensional_similarity(u1, u2).mean
-    # DeepWalk euclidean distance
-    v1 = deepwalk[u1]
-    v2 = deepwalk[u2]
+    if embedding_method == "DW":
+      # DeepWalk euclidean distance
+      v1 = deepwalk[u1]
+      v2 = deepwalk[u2]
+    else:
+      v1 = property_vectors[u1]
+      v2 = property_vectors[u2]
     vec_dist = distance.euclidean(v1, v2)
     row = ",".join([
       u1,
@@ -431,6 +436,52 @@ def compare():
   print("pearson = {}\nspearman = {}\nkendall = {}".format(pearson, spearman, kendall))
   results_csv_fp.close()
 
+# ----------
+fuzzy_membership_values = {}
+property_vectors = {}
+
+def calculate_fuzzy_membership_values():
+  global fuzzy_membership_values
+  num_users = len(get_concepts(user_id_prefix))
+
+  def get_user_with_property(prop, pred):
+    return execute_atom(atomspace,
+             GetLink(
+               EvaluationLink(
+                 PredicateNode(pred),
+                 ListLink(
+                   VariableNode("$X"),
+                   prop)))).out
+
+  for p in get_concepts(target_id_prefix):
+    fuzzy_membership_values[p.name] = 1 - (len(get_user_with_property(p, "has_action_target")) / num_users)
+    print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
+
+  for p in get_concepts(feature_prefix):
+    fuzzy_membership_values[p.name] = 1 - (len(get_user_with_property(p, "has_action_feature")) / num_users)
+    print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
+
+  for p in [ConceptNode("dropped-out"), ConceptNode("not-dropped-out")]:
+    fuzzy_membership_values[p.name] = 1 - (len(get_user_with_property(p, "has")) / num_users)
+    print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
+
+def build_property_vectors():
+  print("--- Building vectors")
+
+  global property_vectors
+  all_evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
+
+  for c in get_concepts(user_id_prefix):
+    pvec = []
+    listlinks = [x for x in c.incoming if x.type == types.ListLink]
+    evalinks = [x.incoming[0] for x in listlinks if x.incoming[0].type == types.EvaluationLink]
+    for e in all_evalinks:
+      if e in evalinks:
+        pvec.append(fuzzy_membership_values[e.out[1].out[1].name])
+      else:
+        pvec.append(0)
+    property_vectors[c.name] = pvec
+
 ### Main ###
 # load_all_atoms()
 # load_deepwalk_model()
@@ -444,4 +495,7 @@ train_deepwalk_model()
 export_deepwalk_model()
 plot_pca()
 
-compare()
+# calculate_fuzzy_membership_values()
+# build_property_vectors()
+
+compare("DW")
