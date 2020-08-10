@@ -1,4 +1,4 @@
-import csv
+import numpy
 import os
 import pickle
 import random
@@ -346,18 +346,7 @@ def plot_pca(embedding_method):
   pyplot.savefig(pca_png, dpi=1000)
 
 def compare(embedding_method):
-  print("--- Comparing PLN vs DW")
-
-  node_pattern_dict = {}
-  def get_properties(node):
-    def get_attractions(node):
-      return [x for x in node.incoming if x.type == types.AttractionLink and x.out[0] == node]
-    if node_pattern_dict.get(node):
-      return node_pattern_dict[node]
-    else:
-      pats = [x.out[1] for x in get_attractions(node)]
-      node_pattern_dict[node] = pats
-    return pats
+  print("--- Comparing PLN vs " + embedding_method)
 
   # Get the pairs
   print("--- Generating pairs")
@@ -373,31 +362,18 @@ def compare(embedding_method):
   people_pairs = [tuple(x) for x in people_pairs]
 
   print("--- Generating results")
+
   # PLN setup
   scm("(pln-load 'empty)")
   scm("(pln-add-rule \"intensional-similarity-direct-introduction-rule\")")
 
-  # Output file
-  results_csv_fp = open(results_csv, "w")
-  first_row = ",".join([
-    "Person 1",
-    "Person 2",
-    "No. of person 1 properties",
-    "No. of person 2 properties",
-    "No. of common properties",
-    "Intensional Similarity",
-    "Vector distance",
-    "Pearson",
-    "Spearman",
-    "Kendall"])
-  results_csv_fp.write(first_row + "\n")
-
   # Generate the results
+  all_rows = []
   for pair in people_pairs:
     p1 = pair[0]
     p2 = pair[1]
-    p1_properties = get_properties(ConceptNode(p1))
-    p2_properties = get_properties(ConceptNode(p2))
+    p1_properties = get_concept_properties(ConceptNode(p1))
+    p2_properties = get_concept_properties(ConceptNode(p2))
     p1_pattern_size = len(p1_properties)
     p2_pattern_size = len(p2_properties)
     common_properties = set(p1_properties).intersection(p2_properties)
@@ -412,49 +388,29 @@ def compare(embedding_method):
       v1 = property_vector_dict[p1]
       v2 = property_vector_dict[p2]
     vec_dist = distance.euclidean(v1, v2)
-    row = ",".join([
+    row = [
       p1,
       p2,
-      str(p1_pattern_size),
-      str(p2_pattern_size),
-      str(common_pattern_size),
-      str(intsim_tv),
-      str(vec_dist)])
-    results_csv_fp.write(row + "\n")
-  results_csv_fp.close()
+      p1_pattern_size,
+      p2_pattern_size,
+      common_pattern_size,
+      intsim_tv,
+      vec_dist]
+    all_rows.append(row)
 
-  # For correlations
-  csv_reader = csv.reader(open(results_csv))
-  intsim_col_idx = first_row.split(",").index("Intensional Similarity")
-  vecdist_col_idx = first_row.split(",").index("Vector distance")
-  # Skip the first row (column names) before sorting the floats
-  next(csv_reader)
-  sorted_results = sorted(csv_reader, key=lambda row: float(row[intsim_col_idx]), reverse=True)
+  # Sort in descending order of intensional similarity
+  intsim_col_idx = 5
+  vecdist_col_idx = 6
+  all_rows = numpy.array(all_rows)
+  all_rows_sorted = all_rows[all_rows[:, intsim_col_idx].argsort()][::-1]
 
-  results_csv_fp = open(results_csv, "w")
-  results_csv_fp.write(first_row + "\n")
+  intsim_columns = all_rows_sorted[:, intsim_col_idx].astype(numpy.float)
+  vecdist_columns = all_rows_sorted[:, vecdist_col_idx].astype(numpy.float)
+  pearson = pearsonr(intsim_columns, vecdist_columns)[0]
+  spearman = spearmanr(intsim_columns, vecdist_columns)[0]
+  kendall = kendalltau(intsim_columns, vecdist_columns)[0]
 
-  intsim_n = []
-  vecdist_n = []
-
-  for row in sorted_results:
-    intsim_n.append(float(row[intsim_col_idx]))
-    vecdist_n.append(float(row[vecdist_col_idx]))
-
-    if len(intsim_n) >= 10:
-      pearson = pearsonr(intsim_n, vecdist_n)[0]
-      spearman = spearmanr(intsim_n, vecdist_n)[0]
-      kendall = kendalltau(intsim_n, vecdist_n)[0]
-    else:
-      pearson = "-"
-      spearman = "-"
-      kendall = "-"
-
-    new_row = ",".join([",".join(row), ",".join([str(pearson), str(spearman), str(kendall)])])
-    results_csv_fp.write(new_row + "\n")
-
-  print("pearson = {}\nspearman = {}\nkendall = {}".format(pearson, spearman, kendall))
-  results_csv_fp.close()
+  print("Pearson = {}\nSpearman = {}\nKendall = {}".format(pearson, spearman, kendall))
 
 def calculate_fuzzy_membership_values():
   global fuzzy_membership_values
