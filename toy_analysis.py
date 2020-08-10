@@ -27,7 +27,7 @@ deepwalk_bin = base_results_dir + "deepwalk.bin"
 pca_png = base_results_dir + "pca.png"
 results_csv = base_results_dir + "results.csv"
 
-subuniverse_prefix = "subuniverse:"
+instance_prefix = "instance:"
 person_prefix = "person:"
 property_prefix = "property:"
 
@@ -144,11 +144,11 @@ def populate_atomspace():
 
   # Create people and the properties linked to them
   for i in range(0, num_people):
-    subuniverse_conceptnode = ConceptNode(subuniverse_prefix + str(i))
+    instance_conceptnode = ConceptNode(instance_prefix + str(i))
     person_conceptnode = ConceptNode(person_prefix + str(i))
 
     MemberLink(
-      subuniverse_conceptnode,
+      instance_conceptnode,
       person_conceptnode)
 
     if fixed_num_properties_per_person:
@@ -161,7 +161,7 @@ def populate_atomspace():
       property_conceptnode = ConceptNode(property_prefix + str(j))
 
       MemberLink(
-        subuniverse_conceptnode,
+        instance_conceptnode,
         property_conceptnode)
 
       EvaluationLink(
@@ -331,10 +331,10 @@ def build_property_vectors(pca = False, ica = False):
 
 def plot_pca(embedding_method):
   print("--- Plotting")
-  if embedding_method == "dw":
+  if embedding_method == "DW":
     X = deepwalk[deepwalk.wv.vocab]
     labels = deepwalk.wv.vocab
-  elif embedding_method == "mb":
+  elif embedding_method == "FMBPV":
     X = list(property_vector_dict.values())
     labels = list(property_vector_dict.keys())
   pca = PCA(n_components = 2)
@@ -381,10 +381,10 @@ def compare(embedding_method):
     # PLN intensional similarity
     intsim_tv = intensional_similarity(p1, p2).mean if intensional_similarity(p1, p2).confidence > 0 else 0
     # DeepWalk euclidean distance
-    if embedding_method == "dw":
+    if embedding_method == "DW":
       v1 = deepwalk[p1]
       v2 = deepwalk[p2]
-    elif embedding_method == "mb":
+    elif embedding_method == "FMBPV":
       v1 = property_vector_dict[p1]
       v2 = property_vector_dict[p2]
     vec_dist = distance.euclidean(v1, v2)

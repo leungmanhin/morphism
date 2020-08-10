@@ -5,7 +5,7 @@ from toy_analysis import *
 
 # Different ways of building vectors are being explored, e.g.
 # DW = DeepWalk
-# FMBPV = Membership-based
+# FMBPV = fuzzy-membership-based property vectors
 embedding_method = "DW"
 
 ### Main ###
