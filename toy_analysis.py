@@ -38,6 +38,7 @@ fuzzy_membership_values = {}
 num_people = 100
 num_properties = 1000
 num_properties_per_person = 10
+fixed_num_properties_per_person = False
 num_sentences = 10000000
 num_walks = 9
 pca_components = 100
@@ -150,7 +151,13 @@ def populate_atomspace():
       subuniverse_conceptnode,
       person_conceptnode)
 
-    for j in random.sample(range(num_properties), num_properties_per_person):
+    if fixed_num_properties_per_person:
+      num_person_properties = num_properties_per_person
+    else:
+      num_person_properties = random.randint(1, num_properties_per_person)
+    print("No. of properties person-{} has = {}".format(i, num_person_properties))
+
+    for j in random.sample(range(num_properties), num_person_properties):
       property_conceptnode = ConceptNode(property_prefix + str(j))
 
       MemberLink(
@@ -446,6 +453,7 @@ def compare(embedding_method):
     new_row = ",".join([",".join(row), ",".join([str(pearson), str(spearman), str(kendall)])])
     results_csv_fp.write(new_row + "\n")
 
+  print("pearson = {}\nspearman = {}\nkendall = {}".format(pearson, spearman, kendall))
   results_csv_fp.close()
 
 def calculate_fuzzy_membership_values():
