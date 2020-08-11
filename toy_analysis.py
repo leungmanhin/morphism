@@ -40,7 +40,7 @@ num_properties = 1000
 num_properties_per_person = 10
 fixed_num_properties_per_person = False
 num_sentences = 10000000
-num_walks = 9
+num_walks = 18
 pca_components = 100
 ica_components = 47
 
@@ -206,7 +206,7 @@ def calculate_truth_values():
   # where:
   # s = |A| / |universe|
   # c = |universe|
-  universe_size = len(get_concepts(subuniverse_prefix))
+  universe_size = len(get_concepts(instance_prefix))
   tv_confidence = get_confidence(universe_size)
   for c in atomspace.get_atoms_by_type(types.ConceptNode):
     member_size = len(get_members(c))
@@ -271,10 +271,6 @@ def train_deepwalk_model():
       continue
     source = source_node.name
     target = target_node.name
-    # For using fuzzy membership values for DeepWalk
-    # prob = fuzzy_membership_values[target]
-    # add_to_next_words_dict(source, (pred, target, prob))
-    # add_to_next_words_dict(target, (rev_pred, source, prob))
     add_to_next_words_dict(source, (pred, target))
     add_to_next_words_dict(target, (rev_pred, source))
   for k, v in next_words_dict.items():
