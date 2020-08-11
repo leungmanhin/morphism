@@ -408,6 +408,21 @@ def compare(embedding_method):
 
   print("Pearson = {}\nSpearman = {}\nKendall = {}".format(pearson, spearman, kendall))
 
+
+  # Write to file
+  with open(results_csv, "w") as f:
+    first_row = ",".join([
+      "Person 1",
+      "Person 2",
+      "No. of person 1 properties",
+      "No. of person 2 properties",
+      "No. of common properties",
+      "Intensional Similarity",
+      "Vector Distance"])
+    f.write(first_row + "\n")
+    for row in all_rows_sorted:
+      f.write(",".join(row) + "\n")
+
 def calculate_fuzzy_membership_values():
   global fuzzy_membership_values
   for p in get_concepts(property_prefix):
