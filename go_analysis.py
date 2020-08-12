@@ -7,6 +7,7 @@ from matplotlib import pyplot
 from goatools import obo_parser
 from goatools.semantic import deepest_common_ancestor
 from opencog.atomspace import AtomSpace, types
+from opencog.bindlink import execute_atom
 from opencog.logger import log
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
@@ -23,14 +24,14 @@ subset_true_by_definition = True
 go_basic_obo = os.getcwd() + "/datasets/go-basic.obo"
 go_scm = os.getcwd() + "/datasets/GO_2020-04-01.scm"
 go_annotation_scm = os.getcwd() + "/datasets/GO_annotation_gene-level_2020-04-01.scm"
-member_links_scm = os.getcwd() + "/results/member-links.scm"
-inheritance_links_scm = os.getcwd() + "/results/inheritance-links.scm"
-subset_links_scm = os.getcwd() + "/results/subset-links.scm"
-attraction_links_scm = os.getcwd() + "/results/attraction-links.scm"
-sentences_pickle = os.getcwd() + "/results/sentences.pickle"
-deepwalk_bin = os.getcwd() + "/results/deepwalk.bin"
-pca_png = os.getcwd() + "/results/pca.png"
-results_csv = os.getcwd() + "/results/results.csv"
+member_links_scm = os.getcwd() + "/results/go/member-links.scm"
+inheritance_links_scm = os.getcwd() + "/results/go/inheritance-links.scm"
+subset_links_scm = os.getcwd() + "/results/go/subset-links.scm"
+attraction_links_scm = os.getcwd() + "/results/go/attraction-links.scm"
+sentences_pickle = os.getcwd() + "/results/go/sentences.pickle"
+deepwalk_bin = os.getcwd() + "/results/go/deepwalk.bin"
+pca_png = os.getcwd() + "/results/go/pca.png"
+results_csv = os.getcwd() + "/results/go/results.csv"
 
 go_term_prefix = "GO:"
 
@@ -449,19 +450,214 @@ def compare():
 
   results_csv_fp.close()
 
+##########
+fuzzy_membership_values = {}
+property_vectors = {}
+
+def to_pattern_str(pattern, concept):
+  if pattern.type == types.InheritanceLink:
+    source = pattern.out[0]
+    target = pattern.out[1]
+    if source == concept:
+      return "inh-$x-" + target.name
+    else:
+      return "inh-" + source.name + "-$x"
+
+def calculate_fuzzy_membership_values():
+  global fuzzy_membership_values
+  go_terms = get_concepts(go_term_prefix)
+  num_go_terms = len(go_terms)
+
+  for go_term in go_terms:
+    # Only looking at the "inheritance" relationship at the moment
+    patterns = [x for x in go_term.incoming if x.type == types.InheritanceLink]
+    for p in patterns:
+      source = p.out[0]
+      target = p.out[1]
+
+      if source.type == types.VariableNode or target.type == types.VariableNode:
+        continue
+
+      p_str = to_pattern_str(p, go_term)
+
+      if source == go_term:
+        p_query = \
+          BindLink(
+            TypedVariableLink(
+              VariableNode("$X"),
+              TypeNode("ConceptNode")),
+            PresentLink(
+              InheritanceLink(
+                VariableNode("$X"),
+                target)),
+            VariableNode("$X"))
+      elif target == go_term:
+        p_query = \
+          BindLink(
+            TypedVariableLink(
+              VariableNode("$X"),
+              TypeNode("ConceptNode")),
+            PresentLink(
+              InheritanceLink(
+                source,
+                VariableNode("$X"))),
+            VariableNode("$X"))
+
+      if p_str not in fuzzy_membership_values:
+        go_terms_with_pattern = execute_atom(atomspace, p_query).out
+        freq = len(go_terms_with_pattern)
+        fuzzy_membership_values[p_str] = 1 - (freq / num_go_terms)
+        # print("FMV for '{}' = {}".format(p_str, fuzzy_membership_values[p_str]))
+
+def build_property_vectors():
+  global property_vectors
+  go_terms = get_concepts(go_term_prefix)
+
+  for go_term in go_terms:
+    p_vec = []
+    pattern_strs = [to_pattern_str(x, go_term) for x in go_term.incoming if x.type == types.InheritanceLink]
+
+    for p in fuzzy_membership_values.keys():
+      if p in pattern_strs:
+        p_vec.append(fuzzy_membership_values[p])
+      else:
+        p_vec.append(0)
+
+    property_vectors[go_term.name] = p_vec
+
+def compare_2():
+  global property_vectors
+  print("--- Comparing PLN vs DW")
+
+  def get_go_terms_in_hierarchy():
+    go_terms = set()
+    for subset in atomspace.get_atoms_by_type(types.SubsetLink):
+      tv = subset.tv
+      # Only look at the ones loaded directly from data, i.e. having (stv 1 1),
+      # and excluded the inferred ones
+      if tv.mean == 1 and tv.confidence == 1:
+        go_terms.add(subset.out[0].name)
+        go_terms.add(subset.out[1].name)
+    return list(go_terms)
+
+  node_pattern_dict = {}
+  def get_properties(node):
+    def get_attractions(node):
+      return [x for x in node.incoming if x.type == types.AttractionLink and x.out[0] == node]
+    if node_pattern_dict.get(node):
+      return node_pattern_dict[node]
+    else:
+      # Filter out the ones with mean == 0
+      attractions = [x for x in get_attractions(node) if x.tv.mean > 0]
+      pats = [x.out[1] for x in attractions]
+      node_pattern_dict[node] = pats
+    return pats
+
+  # Get the user pairs
+  print("--- Generating GO term pairs")
+  gos = get_go_terms_in_hierarchy()
+  random.shuffle(gos)
+  go_pairs = list(zip(gos[::2], gos[1::2]))
+
+  print("--- Generating results")
+  # PLN setup
+  scm("(pln-load 'empty)")
+  scm("(pln-add-rule \"intensional-similarity-direct-introduction-rule\")")
+
+  # Output file
+  results_csv_fp = open(results_csv, "w")
+  first_row = ",".join([
+    "GO 1",
+    "GO 2",
+    "No. of GO 1 properties",
+    "No. of GO 2 properties",
+    "No. of common properties",
+    "Intensional Similarity",
+    "Vector distance",
+    "Pearson",
+    "Spearman",
+    "Kendall"])
+  results_csv_fp.write(first_row + "\n")
+
+  # Generate the results
+  for pair in go_pairs:
+    go1 = pair[0]
+    go2 = pair[1]
+    go1_properties = get_properties(ConceptNode(go1))
+    go2_properties = get_properties(ConceptNode(go2))
+    go1_pattern_size = len(go1_properties)
+    go2_pattern_size = len(go2_properties)
+    common_properties = set(go1_properties).intersection(go2_properties)
+    common_pattern_size = len(common_properties)
+    intsim_tv = intensional_similarity(go1, go2)
+    intsim_tv_mean = intsim_tv.mean if intsim_tv.confidence > 0 else 0
+    # DeepWalk euclidean distance
+    v1 = property_vectors[go1]
+    v2 = property_vectors[go2]
+    vec_dist = distance.euclidean(v1, v2)
+    # The complete row
+    row = ",".join([
+      go1,
+      go2,
+      str(go1_pattern_size),
+      str(go2_pattern_size),
+      str(common_pattern_size),
+      str(intsim_tv_mean),
+      str(vec_dist)])
+    results_csv_fp.write(row + "\n")
+  results_csv_fp.close()
+
+  # For correlations
+  csv_reader = csv.reader(open(results_csv))
+  intsim_col_idx = first_row.split(",").index("Intensional Similarity")
+  vecdist_col_idx = first_row.split(",").index("Vector distance")
+  # Skip the first row (column names) before sorting the floats
+  next(csv_reader)
+  sorted_results = sorted(csv_reader, key=lambda row: float(row[intsim_col_idx]), reverse=True)
+
+  results_csv_fp = open(results_csv, "w")
+  results_csv_fp.write(first_row + "\n")
+
+  intsim_n = []
+  vecdist_n = []
+
+  for row in sorted_results:
+    intsim_n.append(float(row[intsim_col_idx]))
+    vecdist_n.append(float(row[vecdist_col_idx]))
+
+    if len(intsim_n) >= 10:
+      pearson = pearsonr(intsim_n, vecdist_n)[0]
+      spearman = spearmanr(intsim_n, vecdist_n)[0]
+      kendall = kendalltau(intsim_n, vecdist_n)[0]
+    else:
+      pearson = "-"
+      spearman = "-"
+      kendall = "-"
+
+    new_row = ",".join([",".join(row), ",".join([str(pearson), str(spearman), str(kendall)])])
+    results_csv_fp.write(new_row + "\n")
+
+  print("pearson = {}\nspearman = {}\nkendall = {}".format(pearson, spearman, kendall))
+
+  results_csv_fp.close()
+
 ### Main ###
-# load_all_atoms()
+load_all_atoms()
 # load_deepwalk_model()
 
-populate_atomspace()
-infer_subsets_and_members()
-calculate_truth_values()
-infer_attractions()
-export_all_atoms()
-# XXX: Workaround the issue of getting SubsetLinks as well when only InheritanceLinks are expected
-[atomspace.remove(s) for s in atomspace.get_atoms_by_type(types.SubsetLink)]
-train_deepwalk_model()
-export_deepwalk_model()
+# populate_atomspace()
+# infer_subsets_and_members()
+# calculate_truth_values()
+# infer_attractions()
+# export_all_atoms()
+# # XXX: Workaround the issue of getting SubsetLinks as well when only InheritanceLinks are expected
+# [atomspace.remove(s) for s in atomspace.get_atoms_by_type(types.SubsetLink)]
+# train_deepwalk_model()
+# export_deepwalk_model()
 # plot_pca()
 
-compare()
+# compare()
+
+calculate_fuzzy_membership_values()
+build_property_vectors()
+compare_2()
