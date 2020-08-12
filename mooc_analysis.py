@@ -44,6 +44,9 @@ atomspace = AtomSpace()
 initialize_opencog(atomspace)
 
 ### Guile setup ###
+def scm(atomese):
+  return scheme_eval(atomspace, atomese).decode("utf-8")
+
 scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
 scm("(add-to-load-path \".\")")
 scm("(use-modules (opencog) (opencog ure) (opencog pln))")
@@ -182,8 +185,8 @@ def compare(embedding_method):
       v1 = deepwalk[p1]
       v2 = deepwalk[p2]
     elif embedding_method == "FMBPV":
-      v1 = property_vector_dict[p1]
-      v2 = property_vector_dict[p2]
+      v1 = property_vectors[p1]
+      v2 = property_vectors[p2]
     # vec_dist = distance.euclidean(v1, v2)
     # vec_dist = distance.cityblock(v1, v2)
     vec_dist = distance.jaccard(v1, v2)
@@ -466,9 +469,6 @@ def train_deepwalk_model():
   print("--- Training model")
   deepwalk = Word2Vec(sentences, min_count=1)
 
-def scm(atomese):
-  return scheme_eval(atomspace, atomese).decode("utf-8")
-
 ### Main ###
 load_all_atoms()
 # load_deepwalk_model()
@@ -484,4 +484,4 @@ load_all_atoms()
 
 build_property_vectors()
 
-compare("FMPV")
+compare("FMBPV")
