@@ -33,7 +33,6 @@ property_prefix = "property:"
 
 deepwalk = None
 property_vector_dict = {}
-fuzzy_membership_values = {}
 
 num_people = 100
 num_properties = 1000
@@ -282,11 +281,6 @@ def train_deepwalk_model():
     sentence = [random.choice(first_words)]
     for j in range(num_walks):
       last_word = sentence[-1]
-      # For using fuzzy membership values for DeepWalk
-      # candidates = next_words_dict.get(last_word)
-      # phrases = [c[:2] for c in candidates]
-      # probabilities = [c[2] for c in candidates]
-      # next_words = random.choices(phrases, probabilities, k=1)[0]
       next_words = random.choice(next_words_dict.get(last_word))
       sentence.append(next_words[0])
       sentence.append(next_words[1])
@@ -305,12 +299,10 @@ def build_property_vectors(pca = False, ica = False):
 
   for person in get_concepts(person_prefix):
     pvec = []
-    properties = get_concept_properties(person)
     for p in all_properties:
-      if p in properties:
-        pvec.append(fuzzy_membership_values[p.name])
-      else:
-        pvec.append(0)
+      attraction = AttractionLink(person, p)
+      attraction_tv = attraction.tv
+      pvec.append(attraction.tv.mean * attraction.tv.confidence)
     property_vector_dict[person.name] = pvec
   # Do PCA for the sparse vectors
   if pca:
@@ -375,15 +367,19 @@ def compare(embedding_method):
     common_properties = set(p1_properties).intersection(p2_properties)
     common_pattern_size = len(common_properties)
     # PLN intensional similarity
-    intsim_tv = intensional_similarity(p1, p2).mean if intensional_similarity(p1, p2).confidence > 0 else 0
-    # DeepWalk euclidean distance
+    intsim = intensional_similarity(p1, p2)
+    intsim_tv = intsim.mean if intsim.confidence > 0 else 0
+    # Vector distance
     if embedding_method == "DW":
       v1 = deepwalk[p1]
       v2 = deepwalk[p2]
     elif embedding_method == "FMBPV":
       v1 = property_vector_dict[p1]
       v2 = property_vector_dict[p2]
-    vec_dist = distance.euclidean(v1, v2)
+    # vec_dist = distance.euclidean(v1, v2)
+    # vec_dist = distance.cityblock(v1, v2)
+    vec_dist = distance.jaccard(v1, v2)
+    # vec_dist = fuzzy_jaccard(p1, p2, v1, v2)
     row = [
       p1,
       p2,
@@ -408,7 +404,6 @@ def compare(embedding_method):
 
   print("Pearson = {}\nSpearman = {}\nKendall = {}".format(pearson, spearman, kendall))
 
-
   # Write to file
   with open(results_csv, "w") as f:
     first_row = ",".join([
@@ -423,8 +418,13 @@ def compare(embedding_method):
     for row in all_rows_sorted:
       f.write(",".join(row) + "\n")
 
-def calculate_fuzzy_membership_values():
-  global fuzzy_membership_values
-  for p in get_concepts(property_prefix):
-    fuzzy_membership_values[p.name] = 1 - (len(get_people_with_property(p)) / num_people)
-    print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
+def fuzzy_jaccard(p1, p2, v1, v2):
+  numerator = 0
+  denominator = 0
+  for x, y in zip(v1, v2):
+    # The "intersect"
+    if x > 0 and y > 0:
+      numerator = numerator + min(x,y)
+    denominator = denominator + max(x,y)
+  tvs = (numerator / denominator) if denominator > 0 else 0
+  return tvs
