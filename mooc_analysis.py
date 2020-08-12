@@ -323,17 +323,6 @@ def load_property_vectors():
   print("--- Loading property vectors from \"{}\"".format(property_vector_pickle))
   property_vectors = pickle.load(open(property_vector_pickle, "rb"))
 
-def plot_pca():
-  print("--- Plotting")
-  X = deepwalk[deepwalk.wv.vocab]
-  pca = PCA(n_components = 2)
-  result = pca.fit_transform(X)
-  pyplot.scatter(result[:, 0], result[:, 1])
-  words = list(deepwalk.wv.vocab)
-  for i, word in enumerate(words):
-    pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
-  pyplot.savefig(pca_png, dpi=1000)
-
 def populate_atomspace():
   # Notes for this dataset:
   # - Each action is taken by one and only one user

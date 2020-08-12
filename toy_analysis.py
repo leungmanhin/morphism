@@ -328,22 +328,6 @@ def export_property_vectors():
   with open(property_vector_pickle, "wb") as f:
     pickle.dump(property_vector_dict, f)
 
-def plot_pca(embedding_method):
-  print("--- Plotting")
-  if embedding_method == "DW":
-    X = deepwalk[deepwalk.wv.vocab]
-    labels = deepwalk.wv.vocab
-  elif embedding_method == "FMBPV":
-    X = list(property_vector_dict.values())
-    labels = list(property_vector_dict.keys())
-  pca = PCA(n_components = 2)
-  result = pca.fit_transform(X)
-  pyplot.scatter(result[:, 0], result[:, 1])
-  words = list(labels)
-  for i, word in enumerate(words):
-    pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
-  pyplot.savefig(pca_png, dpi=1000)
-
 def compare(embedding_method):
   print("--- Comparing PLN vs " + embedding_method)
 
