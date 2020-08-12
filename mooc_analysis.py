@@ -34,13 +34,239 @@ target_id_prefix = "target:"
 feature_prefix = "feature:"
 
 deepwalk = None
+num_sentences = 10000000
+num_walks = 15
+property_vectors = {}
+pca_components = 2000
 
-### Utils ###
-def scm(atomese):
-  return scheme_eval(atomspace, atomese).decode("utf-8")
+### Initialize the AtomSpace ###
+atomspace = AtomSpace()
+initialize_opencog(atomspace)
+
+### Guile setup ###
+scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
+scm("(add-to-load-path \".\")")
+scm("(use-modules (opencog) (opencog ure) (opencog pln))")
+scm(" ".join([
+  "(define (write-atoms-to-file file atoms)",
+    "(define fp (open-output-file file))",
+    "(for-each",
+      "(lambda (x) (display x fp))",
+      "atoms)",
+    "(close-port fp))"]))
+
+def build_property_vectors():
+  print("--- Building vectors")
+
+  global property_vectors
+  all_evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
+
+  for user in get_concepts(user_id_prefix):
+    pvec = []
+
+    for e in all_evalinks:
+      prop = e.out[1].out[1]
+      attraction = AttractionLink(user, prop)
+      attraction_tv = attraction.tv
+      pvec.append(attraction.tv.mean * attraction.tv.confidence)
+    property_vectors[user.name] = pvec
+
+  with open(base_results_dir + "property_vectors.pickle", "wb") as f:
+    pickle.dump(property_vectors, f)
+
+  # Do PCA for the sparse vectors
+  print("--- Doing PCA")
+  pca = PCA(n_components = pca_components)
+  pca_results = pca.fit_transform(list(property_vectors.values()))
+  for k, pca_v in zip(property_vectors.keys(), pca_results):
+    property_vectors[k] = pca_v
+
+  with open(base_results_dir + "property_vectors_pca.pickle", "wb") as f:
+    pickle.dump(property_vectors, f)
+
+def calculate_truth_values():
+  print("--- Calculating Truth Values")
+
+  node_member_dict = {}
+  def get_members(node):
+    if node_member_dict.get(node):
+      return node_member_dict[node]
+    else:
+      memblinks = [x for x in node.incoming if x.type == types.MemberLink and x.out[1] == node]
+      members = [x.out[0] for x in tuple(memblinks)]
+      node_member_dict[node] = members
+      return members
+
+  def get_confidence(count):
+    return float(scm("(count->confidence " + str(count) + ")"))
+
+  # EvaluationLinks are generated directly from the data, can be considered as true
+  for e in atomspace.get_atoms_by_type(types.EvaluationLink):
+    e.tv = TruthValue(1, 1)
+
+  # MemberLinks are generated directly from the data, can be considered as true
+  for m in atomspace.get_atoms_by_type(types.MemberLink):
+    m.tv = TruthValue(1, 1)
+
+  # ConceptNode "A" (stv s c)
+  # where:
+  # s = |A| / |universe|
+  # c = |universe|
+  universe_size = len(get_concepts(course_id_prefix))
+  tv_confidence = get_confidence(universe_size)
+  for c in atomspace.get_atoms_by_type(types.ConceptNode):
+    member_size = len(get_members(c))
+    tv_strength = member_size / universe_size
+    c.tv = TruthValue(tv_strength, tv_confidence)
+
+  # SubsetLink (stv s c)
+  #   A
+  #   B
+  # where:
+  # s = |B intersect A| / |A|
+  # c = |A|
+  for s in atomspace.get_atoms_by_type(types.SubsetLink):
+    node1 = s.out[0]
+    node2 = s.out[1]
+    node1_members = get_members(node1)
+    node2_members = get_members(node2)
+    common_members = set(node2_members).intersection(node1_members)
+    tv_strength = len(common_members) / len(node1_members)
+    tv_confidence = get_confidence(len(node1_members))
+    s.tv = TruthValue(tv_strength, tv_confidence)
+
+def compare(embedding_method):
+  print("--- Comparing PLN vs " + embedding_method)
+
+  node_pattern_dict = {}
+  def get_properties(node):
+    def get_attractions(node):
+      return [x for x in node.incoming if x.type == types.AttractionLink and x.out[0] == node]
+    if node_pattern_dict.get(node):
+      return node_pattern_dict[node]
+    else:
+      pats = [x.out[1] for x in get_attractions(node) if x.tv.mean * x.tv.confidence > 0]
+      node_pattern_dict[node] = pats
+    return pats
+
+  # Get the user pairs
+  print("--- Generating user pairs")
+  users = [x.name for x in get_concepts(user_id_prefix)]
+  random.shuffle(users)
+  user_pairs = list(zip(users[::2], users[1::2]))
+
+  print("--- Generating results")
+
+  # PLN setup
+  scm("(pln-load 'empty)")
+  scm("(pln-add-rule \"intensional-similarity-direct-introduction-rule\")")
+
+  # Generate the results
+  all_rows = []
+  for pair in user_pairs:
+    p1 = pair[0]
+    p2 = pair[1]
+    p1_properties = get_properties(ConceptNode(p1))
+    p2_properties = get_properties(ConceptNode(p2))
+    p1_pattern_size = len(p1_properties)
+    p2_pattern_size = len(p2_properties)
+    common_properties = set(p1_properties).intersection(p2_properties)
+    common_pattern_size = len(common_properties)
+    # PLN intensional similarity
+    intsim = intensional_similarity(p1, p2)
+    intsim_tv = intsim.mean if intsim.confidence > 0 else 0
+    # Vector distance
+    if embedding_method == "DW":
+      v1 = deepwalk[p1]
+      v2 = deepwalk[p2]
+    elif embedding_method == "FMBPV":
+      v1 = property_vector_dict[p1]
+      v2 = property_vector_dict[p2]
+    # vec_dist = distance.euclidean(v1, v2)
+    # vec_dist = distance.cityblock(v1, v2)
+    vec_dist = distance.jaccard(v1, v2)
+    # vec_dist = fuzzy_jaccard(p1, p2, v1, v2)
+    row = [
+      p1,
+      p2,
+      p1_pattern_size,
+      p2_pattern_size,
+      common_pattern_size,
+      intsim_tv,
+      vec_dist]
+    all_rows.append(row)
+
+  # Sort in descending order of intensional similarity
+  intsim_col_idx = 5
+  vecdist_col_idx = 6
+  all_rows = numpy.array(all_rows)
+  all_rows_sorted = all_rows[all_rows[:, intsim_col_idx].argsort()][::-1]
+
+  intsim_columns = all_rows_sorted[:, intsim_col_idx].astype(numpy.float)
+  vecdist_columns = all_rows_sorted[:, vecdist_col_idx].astype(numpy.float)
+  pearson = pearsonr(intsim_columns, vecdist_columns)[0]
+  spearman = spearmanr(intsim_columns, vecdist_columns)[0]
+  kendall = kendalltau(intsim_columns, vecdist_columns)[0]
+
+  print("Pearson = {}\nSpearman = {}\nKendall = {}".format(pearson, spearman, kendall))
+
+  # Write to file
+  with open(results_csv, "w") as f:
+    first_row = ",".join([
+      "Person 1",
+      "Person 2",
+      "No. of person 1 properties",
+      "No. of person 2 properties",
+      "No. of common properties",
+      "Intensional Similarity",
+      "Vector Distance"])
+    f.write(first_row + "\n")
+    for row in all_rows_sorted:
+      f.write(",".join(row) + "\n")
+
+def export_all_atoms():
+  def write_atoms_to_file(filename, atom_list_str):
+    scm(" ".join([
+      "(write-atoms-to-file",
+      "\"" + filename + "\"",
+      atom_list_str + ")"]))
+
+  print("--- Exporting Atoms to files")
+  write_atoms_to_file(member_links_scm, "(cog-get-atoms 'MemberLink)")
+  write_atoms_to_file(evaluation_links_scm, "(cog-get-atoms 'EvaluationLink)")
+  write_atoms_to_file(subset_links_scm, "(cog-get-atoms 'SubsetLink)")
+  write_atoms_to_file(attraction_links_scm, "(cog-get-atoms 'AttractionLink)")
+
+def export_deepwalk_model():
+  global deepwalk
+  deepwalk.save(deepwalk_bin)
+
+def generate_subsets():
+  print("--- Generating SubsetLinks")
+  for evalink in atomspace.get_atoms_by_type(types.EvaluationLink):
+    source = evalink.out[1].out[0]
+    target = evalink.out[1].out[1]
+    SubsetLink(source, target)
+    SubsetLink(target, source)
 
 def get_concepts(str_prefix):
   return [x for x in atomspace.get_atoms_by_type(types.ConceptNode) if x.name.startswith(str_prefix)]
+
+def infer_attractions():
+  print("--- Inferring AttractionLinks")
+  scm("(pln-load 'empty)")
+  # (Subset A B) |- (Subset (Not A) B)
+  scm("(pln-add-rule \"subset-condition-negation-rule\")")
+  # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
+  scm("(pln-add-rule \"subset-attraction-introduction-rule\")")
+  scm(" ".join(["(pln-bc",
+                  "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
+                  "#:vardecl",
+                    "(VariableSet",
+                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
+                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                  "#:maximum-iterations 12",
+                  "#:complexity-penalty 10)"]))
 
 def intensional_difference(c1, c2):
   cn1 = "(Concept \"{}\")".format(c1)
@@ -60,22 +286,6 @@ def intensional_similarity(c1, c2):
   tv_conf = float(scm("(cog-confidence {})".format(intsim)))
   return TruthValue(tv_mean, tv_conf)
 
-### Initialize the AtomSpace ###
-atomspace = AtomSpace()
-initialize_opencog(atomspace)
-
-### Guile setup ###
-scm("(add-to-load-path \"/usr/share/guile/site/2.2/opencog\")")
-scm("(add-to-load-path \".\")")
-scm("(use-modules (opencog) (opencog ure) (opencog pln))")
-scm(" ".join([
-  "(define (write-atoms-to-file file atoms)",
-    "(define fp (open-output-file file))",
-    "(for-each",
-      "(lambda (x) (display x fp))",
-      "atoms)",
-    "(close-port fp))"]))
-
 def load_all_atoms():
   print("--- Loading Atoms from files")
   scm("(use-modules (opencog persist-file))")
@@ -84,37 +294,31 @@ def load_all_atoms():
   scm("(load-file \"" + subset_links_scm + "\")")
   scm("(load-file \"" + attraction_links_scm + "\")")
 
-def export_all_atoms():
-  def write_atoms_to_file(filename, atom_list_str):
-    scm(" ".join([
-      "(write-atoms-to-file",
-      "\"" + filename + "\"",
-      atom_list_str + ")"]))
-
-  print("--- Exporting Atoms to files")
-  write_atoms_to_file(member_links_scm, "(cog-get-atoms 'MemberLink)")
-  write_atoms_to_file(evaluation_links_scm, "(cog-get-atoms 'EvaluationLink)")
-  write_atoms_to_file(subset_links_scm, "(cog-get-atoms 'SubsetLink)")
-  write_atoms_to_file(attraction_links_scm, "(cog-get-atoms 'AttractionLink)")
-
 def load_deepwalk_model():
   global deepwalk
   print("--- Loading an existing model from \"{}\"".format(deepwalk_bin))
   deepwalk = Word2Vec.load(deepwalk_bin)
 
-def export_deepwalk_model():
-  global deepwalk
-  deepwalk.save(deepwalk_bin)
+def plot_pca():
+  print("--- Plotting")
+  X = deepwalk[deepwalk.wv.vocab]
+  pca = PCA(n_components = 2)
+  result = pca.fit_transform(X)
+  pyplot.scatter(result[:, 0], result[:, 1])
+  words = list(deepwalk.wv.vocab)
+  for i, word in enumerate(words):
+    pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
+  pyplot.savefig(pca_png, dpi=1000)
 
-### Populate the AtomSpace ###
-# Notes for this dataset:
-# - Each action is taken by one and only one user
-#   i.e. it's not very useful, so everything associated with it
-#   will be passed to the user directly
-# - A user will not come back once he/she has dropped-out,
-#   i.e. each user is assumed to have taken only one course
 def populate_atomspace():
+  # Notes for this dataset:
+  # - Each action is taken by one and only one user
+  #   i.e. it's not very useful, so everything associated with it
+  #   will be passed to the user directly
+  # - A user will not come back once he/she has dropped-out,
+  #   i.e. each user is assumed to have taken only one course
   print("--- Populating the AtomSpace")
+
   action_feature_dict = {}
   with open(mooc_action_features_tsv) as f:
     action_features = []
@@ -198,81 +402,6 @@ def populate_atomspace():
       if user_name not in dropout_users:
         scm(evalink("has", user_name, "not-dropped-out"))
 
-def generate_subsets():
-  print("--- Generating SubsetLinks")
-  for evalink in atomspace.get_atoms_by_type(types.EvaluationLink):
-    source = evalink.out[1].out[0]
-    target = evalink.out[1].out[1]
-    SubsetLink(source, target)
-    SubsetLink(target, source)
-
-def calculate_truth_values():
-  print("--- Calculating Truth Values")
-
-  node_member_dict = {}
-  def get_members(node):
-    if node_member_dict.get(node):
-      return node_member_dict[node]
-    else:
-      memblinks = [x for x in node.incoming if x.type == types.MemberLink and x.out[1] == node]
-      members = [x.out[0] for x in tuple(memblinks)]
-      node_member_dict[node] = members
-      return members
-
-  def get_confidence(count):
-    return float(scm("(count->confidence " + str(count) + ")"))
-
-  # EvaluationLinks are generated directly from the data, can be considered as true
-  for e in atomspace.get_atoms_by_type(types.EvaluationLink):
-    e.tv = TruthValue(1, 1)
-
-  # MemberLinks are generated directly from the data, can be considered as true
-  for m in atomspace.get_atoms_by_type(types.MemberLink):
-    m.tv = TruthValue(1, 1)
-
-  # ConceptNode "A" (stv s c)
-  # where:
-  # s = |A| / |universe|
-  # c = |universe|
-  universe_size = len(get_concepts(course_id_prefix))
-  tv_confidence = get_confidence(universe_size)
-  for c in atomspace.get_atoms_by_type(types.ConceptNode):
-    member_size = len(get_members(c))
-    tv_strength = member_size / universe_size
-    c.tv = TruthValue(tv_strength, tv_confidence)
-
-  # SubsetLink (stv s c)
-  #   A
-  #   B
-  # where:
-  # s = |B intersect A| / |A|
-  # c = |A|
-  for s in atomspace.get_atoms_by_type(types.SubsetLink):
-    node1 = s.out[0]
-    node2 = s.out[1]
-    node1_members = get_members(node1)
-    node2_members = get_members(node2)
-    common_members = set(node2_members).intersection(node1_members)
-    tv_strength = len(common_members) / len(node1_members)
-    tv_confidence = get_confidence(len(node1_members))
-    s.tv = TruthValue(tv_strength, tv_confidence)
-
-def infer_attractions():
-  print("--- Inferring AttractionLinks")
-  scm("(pln-load 'empty)")
-  # (Subset A B) |- (Subset (Not A) B)
-  scm("(pln-add-rule \"subset-condition-negation-rule\")")
-  # (Subset A B) (Subset (Not A) B) |- (Attraction A B)
-  scm("(pln-add-rule \"subset-attraction-introduction-rule\")")
-  scm(" ".join(["(pln-bc",
-                  "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
-                  "#:vardecl",
-                    "(VariableSet",
-                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
-                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
-                  "#:maximum-iterations 12",
-                  "#:complexity-penalty 10)"]))
-
 def train_deepwalk_model():
   global deepwalk
   next_words_dict = {}
@@ -307,8 +436,6 @@ def train_deepwalk_model():
     next_words_dict[k] = tuple(v)
 
   print("--- Generating sentences")
-  num_sentences = 10000000
-  num_walks = 15
   first_words = [x.name for x in get_concepts(user_id_prefix)]
   for i in range(num_sentences):
     sentence = [random.choice(first_words)]
@@ -326,180 +453,22 @@ def train_deepwalk_model():
   print("--- Training model")
   deepwalk = Word2Vec(sentences, min_count=1)
 
-def plot_pca():
-  print("--- Plotting")
-  X = deepwalk[deepwalk.wv.vocab]
-  pca = PCA(n_components = 2)
-  result = pca.fit_transform(X)
-  pyplot.scatter(result[:, 0], result[:, 1])
-  words = list(deepwalk.wv.vocab)
-  for i, word in enumerate(words):
-    pyplot.annotate(word, xy = (result[i, 0], result[i, 1]))
-  pyplot.savefig(pca_png, dpi=1000)
-
-def compare(embedding_method):
-  print("--- Comparing PLN vs " + embedding_method)
-
-  node_pattern_dict = {}
-  def get_properties(node):
-    def get_attractions(node):
-      return [x for x in node.incoming if x.type == types.AttractionLink and x.out[0] == node]
-    if node_pattern_dict.get(node):
-      return node_pattern_dict[node]
-    else:
-      pats = [x.out[1] for x in get_attractions(node)]
-      node_pattern_dict[node] = pats
-    return pats
-
-  # Get the user pairs
-  print("--- Generating user pairs")
-  users = [x.name for x in get_concepts(user_id_prefix)]
-  random.shuffle(users)
-  user_pairs = list(zip(users[::2], users[1::2]))
-
-  print("--- Generating results")
-  # PLN setup
-  scm("(pln-load 'empty)")
-  scm("(pln-add-rule \"intensional-similarity-direct-introduction-rule\")")
-
-  # Output file
-  results_csv_fp = open(results_csv, "w")
-  first_row = ",".join([
-    "User 1",
-    "User 2",
-    "No. of user 1 properties",
-    "No. of user 2 properties",
-    "No. of common properties",
-    "Intensional Similarity",
-    "Vector distance",
-    "Pearson",
-    "Spearman",
-    "Kendall"])
-  results_csv_fp.write(first_row + "\n")
-
-  # Generate the results
-  for pair in user_pairs:
-    u1 = pair[0]
-    u2 = pair[1]
-    u1_properties = get_properties(ConceptNode(u1))
-    u2_properties = get_properties(ConceptNode(u2))
-    u1_pattern_size = len(u1_properties)
-    u2_pattern_size = len(u2_properties)
-    common_properties = set(u1_properties).intersection(u2_properties)
-    common_pattern_size = len(common_properties)
-    intsim_tv = intensional_similarity(u1, u2).mean
-    if embedding_method == "DW":
-      # DeepWalk euclidean distance
-      v1 = deepwalk[u1]
-      v2 = deepwalk[u2]
-    else:
-      v1 = property_vectors[u1]
-      v2 = property_vectors[u2]
-    vec_dist = distance.euclidean(v1, v2)
-    row = ",".join([
-      u1,
-      u2,
-      str(u1_pattern_size),
-      str(u2_pattern_size),
-      str(common_pattern_size),
-      str(intsim_tv),
-      str(vec_dist)])
-    results_csv_fp.write(row + "\n")
-  results_csv_fp.close()
-
-  # For correlations
-  csv_reader = csv.reader(open(results_csv))
-  intsim_col_idx = first_row.split(",").index("Intensional Similarity")
-  vecdist_col_idx = first_row.split(",").index("Vector distance")
-  # Skip the first row (column names) before sorting the floats
-  next(csv_reader)
-  sorted_results = sorted(csv_reader, key=lambda row: float(row[intsim_col_idx]), reverse=True)
-
-  results_csv_fp = open(results_csv, "w")
-  results_csv_fp.write(first_row + "\n")
-
-  intsim_n = []
-  vecdist_n = []
-
-  for row in sorted_results:
-    intsim_n.append(float(row[intsim_col_idx]))
-    vecdist_n.append(float(row[vecdist_col_idx]))
-
-    if len(intsim_n) >= 10:
-      pearson = pearsonr(intsim_n, vecdist_n)[0]
-      spearman = spearmanr(intsim_n, vecdist_n)[0]
-      kendall = kendalltau(intsim_n, vecdist_n)[0]
-    else:
-      pearson = "-"
-      spearman = "-"
-      kendall = "-"
-
-    new_row = ",".join([",".join(row), ",".join([str(pearson), str(spearman), str(kendall)])])
-    results_csv_fp.write(new_row + "\n")
-
-  print("pearson = {}\nspearman = {}\nkendall = {}".format(pearson, spearman, kendall))
-  results_csv_fp.close()
-
-# ----------
-fuzzy_membership_values = {}
-property_vectors = {}
-
-def calculate_fuzzy_membership_values():
-  global fuzzy_membership_values
-  num_users = len(get_concepts(user_id_prefix))
-
-  def get_user_with_property(prop, pred):
-    return execute_atom(atomspace,
-             GetLink(
-               EvaluationLink(
-                 PredicateNode(pred),
-                 ListLink(
-                   VariableNode("$X"),
-                   prop)))).out
-
-  for p in get_concepts(target_id_prefix):
-    fuzzy_membership_values[p.name] = 1 - (len(get_user_with_property(p, "has_action_target")) / num_users)
-    print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
-
-  for p in get_concepts(feature_prefix):
-    fuzzy_membership_values[p.name] = 1 - (len(get_user_with_property(p, "has_action_feature")) / num_users)
-    print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
-
-  for p in [ConceptNode("dropped-out"), ConceptNode("not-dropped-out")]:
-    fuzzy_membership_values[p.name] = 1 - (len(get_user_with_property(p, "has")) / num_users)
-    print("FMV for '{}' = {}".format(p.name, fuzzy_membership_values[p.name]))
-
-def build_property_vectors():
-  print("--- Building vectors")
-
-  global property_vectors
-  all_evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
-
-  for c in get_concepts(user_id_prefix):
-    pvec = []
-    listlinks = [x for x in c.incoming if x.type == types.ListLink]
-    evalinks = [x.incoming[0] for x in listlinks if x.incoming[0].type == types.EvaluationLink]
-    for e in all_evalinks:
-      if e in evalinks:
-        pvec.append(fuzzy_membership_values[e.out[1].out[1].name])
-      else:
-        pvec.append(0)
-    property_vectors[c.name] = pvec
+def scm(atomese):
+  return scheme_eval(atomspace, atomese).decode("utf-8")
 
 ### Main ###
-# load_all_atoms()
+load_all_atoms()
 # load_deepwalk_model()
 
-populate_atomspace()
-generate_subsets()
-calculate_truth_values()
-infer_attractions()
-export_all_atoms()
-train_deepwalk_model()
-export_deepwalk_model()
-plot_pca()
+# populate_atomspace()
+# generate_subsets()
+# calculate_truth_values()
+# infer_attractions()
+# export_all_atoms()
+# train_deepwalk_model()
+# export_deepwalk_model()
+# plot_pca()
 
-# calculate_fuzzy_membership_values()
-# build_property_vectors()
+build_property_vectors()
 
-compare("DW")
+compare("FMPV")
