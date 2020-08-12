@@ -24,6 +24,7 @@ subset_links_scm = base_results_dir + "subset-links.scm"
 attraction_links_scm = base_results_dir + "attraction-links.scm"
 sentences_pickle = base_results_dir + "sentences.pickle"
 deepwalk_bin = base_results_dir + "deepwalk.bin"
+property_vector_pickle = base_results_dir + "property_vectors.pickle"
 pca_png = base_results_dir + "pca.png"
 results_csv = base_results_dir + "results.csv"
 
@@ -316,6 +317,16 @@ def build_property_vectors(pca = False, ica = False):
     ica_results = ica.fit_transform(list(property_vector_dict.values()))
     for k, ica_v in zip(property_vector_dict.keys(), ica_results):
       property_vector_dict[k] = ica_v
+
+def load_property_vectors():
+  global property_vector_dict
+  print("--- Loading property vectors from \"{}\"".format(property_vector_pickle))
+  property_vector_dict = pickle.load(open(property_vector_pickle, "rb"))
+
+def export_property_vectors():
+  print("--- Exporting property vectors to \"{}\"".format(property_vector_pickle))
+  with open(property_vector_pickle, "wb") as f:
+    pickle.dump(property_vector_dict, f)
 
 def plot_pca(embedding_method):
   print("--- Plotting")

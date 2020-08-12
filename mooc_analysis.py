@@ -25,6 +25,7 @@ subset_links_scm = base_results_dir + "subset-links.scm"
 attraction_links_scm = base_results_dir + "attraction-links.scm"
 sentences_pickle = base_results_dir + "sentences.pickle"
 deepwalk_bin = base_results_dir + "deepwalk.bin"
+property_vector_pickle = base_results_dir + "property_vectors.pickle"
 pca_png = base_results_dir + "pca.png"
 results_csv = base_results_dir + "results.csv"
 
@@ -73,9 +74,6 @@ def build_property_vectors():
       attraction_tv = attraction.tv
       pvec.append(attraction.tv.mean * attraction.tv.confidence)
     property_vectors[user.name] = pvec
-
-  with open(base_results_dir + "property_vectors.pickle", "wb") as f:
-    pickle.dump(property_vectors, f)
 
   # Do PCA for the sparse vectors
   print("--- Doing PCA")
@@ -246,6 +244,11 @@ def export_deepwalk_model():
   global deepwalk
   deepwalk.save(deepwalk_bin)
 
+def export_property_vectors():
+  print("--- Exporting property vectors to \"{}\"".format(property_vector_pickle))
+  with open(property_vector_pickle, "wb") as f:
+    pickle.dump(property_vectors, f)
+
 def fuzzy_jaccard(p1, p2, v1, v2):
   numerator = 0
   denominator = 0
@@ -314,6 +317,11 @@ def load_deepwalk_model():
   global deepwalk
   print("--- Loading an existing model from \"{}\"".format(deepwalk_bin))
   deepwalk = Word2Vec.load(deepwalk_bin)
+
+def load_property_vectors():
+  global property_vectors
+  print("--- Loading property vectors from \"{}\"".format(property_vector_pickle))
+  property_vectors = pickle.load(open(property_vector_pickle, "rb"))
 
 def plot_pca():
   print("--- Plotting")
@@ -470,18 +478,28 @@ def train_deepwalk_model():
   deepwalk = Word2Vec(sentences, min_count=1)
 
 ### Main ###
+# Different ways of building vectors are being explored, e.g.
+# DW = DeepWalk
+# FMBPV = fuzzy-membership-based property vectors
+embedding_method = "FMBPV"
+
 load_all_atoms()
-# load_deepwalk_model()
+if embedding_method == "DW":
+  load_deepwalk_model()
+elif embedding_method == "FMBPV":
+  load_property_vectors()
 
 # populate_atomspace()
 # generate_subsets()
 # calculate_truth_values()
 # infer_attractions()
 # export_all_atoms()
-# train_deepwalk_model()
-# export_deepwalk_model()
-# plot_pca()
 
-build_property_vectors()
+# if embedding_method == "DW":
+#   train_deepwalk_model()
+#   export_deepwalk_model()
+# elif embedding_method == "FMBPV":
+#   build_property_vectors()
+#   export_property_vectors()
 
-compare("FMBPV")
+compare(embedding_method)
