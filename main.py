@@ -1,7 +1,8 @@
 # To run:
 # python3 -B main.py
 
-from toy_analysis import *
+# from toy_analysis import *
+from mooc_analysis import *
 
 # Different ways of building vectors are being explored, e.g.
 # DW = DeepWalk
