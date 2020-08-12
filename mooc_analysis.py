@@ -164,6 +164,8 @@ def compare(embedding_method):
   # Generate the results
   all_rows = []
   for pair in user_pairs:
+    # JJJ
+    print("=== Comparing {}".format(pair))
     p1 = pair[0]
     p2 = pair[1]
     p1_properties = get_properties(ConceptNode(p1))
@@ -240,6 +242,17 @@ def export_all_atoms():
 def export_deepwalk_model():
   global deepwalk
   deepwalk.save(deepwalk_bin)
+
+def fuzzy_jaccard(p1, p2, v1, v2):
+  numerator = 0
+  denominator = 0
+  for x, y in zip(v1, v2):
+    # The "intersect"
+    if x > 0 and y > 0:
+      numerator = numerator + min(x,y)
+    denominator = denominator + max(x,y)
+  tvs = (numerator / denominator) if denominator > 0 else 0
+  return tvs
 
 def generate_subsets():
   print("--- Generating SubsetLinks")
