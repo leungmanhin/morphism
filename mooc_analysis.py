@@ -1,4 +1,4 @@
-import csv
+import numpy
 import os
 import pickle
 import random
@@ -6,12 +6,15 @@ from gensim.models import Word2Vec
 from matplotlib import pyplot
 from opencog.atomspace import AtomSpace, types
 from opencog.bindlink import execute_atom
+from opencog.logger import log
 from opencog.scheme_wrapper import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
 from scipy.stats import kendalltau, pearsonr, spearmanr
 from sklearn.decomposition import PCA
+
+log.set_level("ERROR")
 
 base_datasets_dir = os.getcwd() + "/datasets/"
 base_results_dir = os.getcwd() + "/results/mooc/"
@@ -25,8 +28,7 @@ subset_links_scm = base_results_dir + "subset-links.scm"
 attraction_links_scm = base_results_dir + "attraction-links.scm"
 sentences_pickle = base_results_dir + "sentences.pickle"
 deepwalk_bin = base_results_dir + "deepwalk.bin"
-property_vector_pickle = base_results_dir + "property_vectors.pickle"
-pca_png = base_results_dir + "pca.png"
+property_vector_pickle = base_results_dir + "property_vectors_original.pickle"
 results_csv = base_results_dir + "results.csv"
 
 course_id_prefix = "course:"
@@ -34,11 +36,10 @@ user_id_prefix = "user:"
 target_id_prefix = "target:"
 feature_prefix = "feature:"
 
+property_vectors = {}
 deepwalk = None
 num_sentences = 10000000
 num_walks = 15
-property_vectors = {}
-pca_components = 2000
 
 ### Initialize the AtomSpace ###
 atomspace = AtomSpace()
@@ -74,16 +75,6 @@ def build_property_vectors():
       attraction_tv = attraction.tv
       pvec.append(attraction.tv.mean * attraction.tv.confidence)
     property_vectors[user.name] = pvec
-
-  # Do PCA for the sparse vectors
-  print("--- Doing PCA")
-  pca = PCA(n_components = pca_components)
-  pca_results = pca.fit_transform(list(property_vectors.values()))
-  for k, pca_v in zip(property_vectors.keys(), pca_results):
-    property_vectors[k] = pca_v
-
-  with open(base_results_dir + "property_vectors_pca.pickle", "wb") as f:
-    pickle.dump(property_vectors, f)
 
 def calculate_truth_values():
   print("--- Calculating Truth Values")
@@ -165,8 +156,6 @@ def compare(embedding_method):
   # Generate the results
   all_rows = []
   for pair in user_pairs:
-    # JJJ
-    print("=== Comparing {}".format(pair))
     p1 = pair[0]
     p2 = pair[1]
     p1_properties = get_properties(ConceptNode(p1))
@@ -187,8 +176,9 @@ def compare(embedding_method):
       v2 = property_vectors[p2]
     # vec_dist = distance.euclidean(v1, v2)
     # vec_dist = distance.cityblock(v1, v2)
-    vec_dist = distance.jaccard(v1, v2)
-    # vec_dist = fuzzy_jaccard(p1, p2, v1, v2)
+    vec_dist = distance.cosine(v1, v2)
+    # vec_dist = distance.jaccard(v1, v2)
+    # vec_dist = fuzzy_jaccard(v1, v2)
     row = [
       p1,
       p2,
@@ -227,6 +217,18 @@ def compare(embedding_method):
     for row in all_rows_sorted:
       f.write(",".join(row) + "\n")
 
+def do_pca():
+  print("--- Doing PCA")
+  pca = PCA()
+  pca_results = pca.fit_transform(list(property_vectors.values()))
+  cum_sum = numpy.cumsum(pca.explained_variance_ratio_)
+  if cum_sum[-1] >= 1:
+    print("--- Best PCA components is {} (sum to 1)".format(numpy.where(cum_sum >= 1)[0][0] + 1))
+  else:
+    print("--- Best PCA components is {} (sum to {})".format(pca.n_components_, cum_sum[-1]))
+  for k, pca_v in zip(property_vectors.keys(), pca_results):
+    property_vectors[k] = pca_v
+
 def export_all_atoms():
   def write_atoms_to_file(filename, atom_list_str):
     scm(" ".join([
@@ -241,7 +243,7 @@ def export_all_atoms():
   write_atoms_to_file(attraction_links_scm, "(cog-get-atoms 'AttractionLink)")
 
 def export_deepwalk_model():
-  global deepwalk
+  print("--- Exporting DeepWalk model to \"{}\"".format(deepwalk_bin))
   deepwalk.save(deepwalk_bin)
 
 def export_property_vectors():
@@ -249,7 +251,7 @@ def export_property_vectors():
   with open(property_vector_pickle, "wb") as f:
     pickle.dump(property_vectors, f)
 
-def fuzzy_jaccard(p1, p2, v1, v2):
+def fuzzy_jaccard(v1, v2):
   numerator = 0
   denominator = 0
   for x, y in zip(v1, v2):

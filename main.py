@@ -2,8 +2,8 @@
 # python3 -B main.py
 
 ### Dataset to be used
-from toy_analysis import *
-# from mooc_analysis import *
+# from toy_analysis import *
+from mooc_analysis import *
 
 ### Different ways of building vectors are being explored
 # DW = DeepWalk
@@ -24,6 +24,7 @@ def generate_embeddings():
     export_deepwalk_model()
   elif embedding_method == "FMBPV":
     build_property_vectors()
+    do_pca()
     export_property_vectors()
 
 def load_atoms():
@@ -39,8 +40,8 @@ def get_results():
   compare(embedding_method)
 
 ### Main ###
-# generate_atoms()
-# generate_embeddings()
 load_atoms()
-load_embeddings()
+# load_embeddings()
+# generate_atoms()
+generate_embeddings()
 get_results()
