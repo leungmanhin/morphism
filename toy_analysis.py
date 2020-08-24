@@ -217,10 +217,14 @@ def do_kpca():
     dist_dict = {}
     mat = []
     i = 0
+    cnt = 0
+    total = X.shape[0] ** 2
     for a in X:
       row = []
       j = 0
       for b in X:
+        cnt += 1
+        print("--- Working on {}/{}...".format(cnt, total))
         if (i, j) in dist_dict:
           row.append(dist_dict[(i, j)])
         elif (j, i) in dist_dict:

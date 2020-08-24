@@ -2,8 +2,8 @@
 # python3 -B main.py
 
 ### Dataset to be used
-# from toy_analysis import *
-from mooc_analysis import *
+from toy_analysis import *
+# from mooc_analysis import *
 
 ### Different ways of building vectors are being explored
 # DW = DeepWalk
