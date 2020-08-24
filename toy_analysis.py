@@ -12,7 +12,7 @@ from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
 from scipy.stats import kendalltau, pearsonr, spearmanr
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, KernelPCA
 
 log.set_level("ERROR")
 
@@ -61,6 +61,8 @@ scm(" ".join([
     "(close-port fp))"]))
 
 def build_property_vectors():
+  print("--- Building property vectors")
+
   global property_vectors
   all_properties = get_concepts(property_prefix)
 
@@ -170,7 +172,8 @@ def compare(embedding_method):
     # vec_dist = distance.cityblock(v1, v2)
     vec_dist = distance.cosine(v1, v2)
     # vec_dist = distance.jaccard(v1, v2)
-    # vec_dist = fuzzy_jaccard(p1, p2, v1, v2)
+    # vec_dist = fuzzy_jaccard(v1, v2)
+    # vec_dist = tanimoto(v1, v2)
     row = [
       p1,
       p2,
@@ -209,6 +212,37 @@ def compare(embedding_method):
     for row in all_rows_sorted:
       f.write(",".join(row) + "\n")
 
+def do_kpca():
+  def kernel_func(X):
+    dist_dict = {}
+    mat = []
+    i = 0
+    for a in X:
+      row = []
+      j = 0
+      for b in X:
+        if (i, j) in dist_dict:
+          row.append(dist_dict[(i, j)])
+        elif (j, i) in dist_dict:
+          row.append(dist_dict[(j, i)])
+        else:
+          dist = fuzzy_jaccard(a, b)
+          # dist = tanimoto(a, b)
+          row.append(dist)
+          dist_dict[(i, j)] = dist
+        j += 1
+      mat.append(row)
+      i += 1
+    return numpy.array(mat)
+
+  print("--- Doing KPCA")
+
+  X = numpy.array(list(property_vectors.values()))
+  X_kpca = KernelPCA(kernel = "precomputed").fit_transform(kernel_func(X))
+
+  for k, kpca_v in zip(property_vectors.keys(), X_kpca):
+    property_vectors[k] = kpca_v
+
 def do_pca():
   print("--- Doing PCA")
   pca = PCA()
@@ -243,7 +277,7 @@ def export_property_vectors():
   with open(property_vector_pickle, "wb") as f:
     pickle.dump(property_vectors, f)
 
-def fuzzy_jaccard(p1, p2, v1, v2):
+def fuzzy_jaccard(v1, v2):
   numerator = 0
   denominator = 0
   for x, y in zip(v1, v2):
@@ -358,6 +392,12 @@ def populate_atomspace():
         ListLink(
           person_conceptnode,
           property_conceptnode))
+
+def tanimoto(v1, v2):
+  v1_v2 = numpy.dot(v1, v2)
+  v1_sq = numpy.sum(numpy.square(v1))
+  v2_sq = numpy.sum(numpy.square(v2))
+  return v1_v2 / (v1_sq + v2_sq - v1_v2)
 
 def train_deepwalk_model():
   global deepwalk

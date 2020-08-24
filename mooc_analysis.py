@@ -12,7 +12,7 @@ from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
 from scipy.stats import kendalltau, pearsonr, spearmanr
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, KernelPCA
 
 log.set_level("ERROR")
 
@@ -28,7 +28,7 @@ subset_links_scm = base_results_dir + "subset-links.scm"
 attraction_links_scm = base_results_dir + "attraction-links.scm"
 sentences_pickle = base_results_dir + "sentences.pickle"
 deepwalk_bin = base_results_dir + "deepwalk.bin"
-property_vector_pickle = base_results_dir + "property_vectors_original.pickle"
+property_vector_pickle = base_results_dir + "property_vectors.pickle"
 results_csv = base_results_dir + "results.csv"
 
 course_id_prefix = "course:"
@@ -61,14 +61,13 @@ scm(" ".join([
     "(close-port fp))"]))
 
 def build_property_vectors():
-  print("--- Building vectors")
+  print("--- Building property vectors")
 
   global property_vectors
   all_evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
 
   for user in get_concepts(user_id_prefix):
     pvec = []
-
     for e in all_evalinks:
       prop = e.out[1].out[1]
       attraction = AttractionLink(user, prop)
@@ -177,8 +176,10 @@ def compare(embedding_method):
     # vec_dist = distance.euclidean(v1, v2)
     # vec_dist = distance.cityblock(v1, v2)
     vec_dist = distance.cosine(v1, v2)
+    # vec_dist = distance.chebyshev(v1, v2)
     # vec_dist = distance.jaccard(v1, v2)
     # vec_dist = fuzzy_jaccard(v1, v2)
+    # vec_dist = tanimoto(v1, v2)
     row = [
       p1,
       p2,
@@ -216,6 +217,37 @@ def compare(embedding_method):
     f.write(first_row + "\n")
     for row in all_rows_sorted:
       f.write(",".join(row) + "\n")
+
+def do_kpca():
+  def kernel_func(X):
+    dist_dict = {}
+    mat = []
+    i = 0
+    for a in X:
+      row = []
+      j = 0
+      for b in X:
+        if (i, j) in dist_dict:
+          row.append(dist_dict[(i, j)])
+        elif (j, i) in dist_dict:
+          row.append(dist_dict[(j, i)])
+        else:
+          dist = fuzzy_jaccard(a, b)
+          # dist = tanimoto(a, b)
+          row.append(dist)
+          dist_dict[(i, j)] = dist
+        j += 1
+      mat.append(row)
+      i += 1
+    return numpy.array(mat)
+
+  print("--- Doing KPCA")
+
+  X = numpy.array(list(property_vectors.values()))
+  X_kpca = KernelPCA(kernel = "precomputed").fit_transform(kernel_func(X))
+
+  for k, kpca_v in zip(property_vectors.keys(), X_kpca):
+    property_vectors[k] = kpca_v
 
 def do_pca():
   print("--- Doing PCA")

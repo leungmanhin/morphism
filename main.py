@@ -24,7 +24,8 @@ def generate_embeddings():
     export_deepwalk_model()
   elif embedding_method == "FMBPV":
     build_property_vectors()
-    do_pca()
+    # do_pca()
+    do_kpca()
     export_property_vectors()
 
 def load_atoms():
