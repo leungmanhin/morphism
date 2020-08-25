@@ -453,6 +453,12 @@ def populate_atomspace():
       if user_name not in dropout_users:
         scm(evalink("has", user_name, "not-dropped-out"))
 
+def tanimoto(v1, v2):
+  v1_v2 = numpy.dot(v1, v2)
+  v1_sq = numpy.sum(numpy.square(v1))
+  v2_sq = numpy.sum(numpy.square(v2))
+  return v1_v2 / (v1_sq + v2_sq - v1_v2)
+
 def train_deepwalk_model():
   global deepwalk
   next_words_dict = {}
