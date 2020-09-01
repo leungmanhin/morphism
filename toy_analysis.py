@@ -169,9 +169,7 @@ def compare(embedding_method):
       v1 = property_vectors[p1]
       v2 = property_vectors[p2]
     # vec_dist = distance.euclidean(v1, v2)
-    # vec_dist = distance.cityblock(v1, v2)
     vec_dist = distance.cosine(v1, v2)
-    # vec_dist = distance.jaccard(v1, v2)
     # vec_dist = fuzzy_jaccard(v1, v2)
     # vec_dist = tanimoto(v1, v2)
     row = [
@@ -230,8 +228,8 @@ def do_kpca():
         elif (j, i) in dist_dict:
           row.append(dist_dict[(j, i)])
         else:
-          dist = fuzzy_jaccard(a, b)
-          # dist = tanimoto(a, b)
+          # dist = fuzzy_jaccard(a, b)
+          dist = tanimoto(a, b)
           row.append(dist)
           dist_dict[(i, j)] = dist
         j += 1
@@ -282,6 +280,10 @@ def export_property_vectors():
     pickle.dump(property_vectors, f)
 
 def fuzzy_jaccard(v1, v2):
+  '''
+  This function is supposed to reflect the actual calculation done in the PLN rule.
+  Check out the 'intensional-similarity-direct-introduction-rule' for details.
+  '''
   numerator = 0
   denominator = 0
   for x, y in zip(v1, v2):

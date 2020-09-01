@@ -30,7 +30,6 @@ sentences_pickle = base_results_dir + "sentences.pickle"
 deepwalk_bin = base_results_dir + "deepwalk.bin"
 property_vector_pickle = base_results_dir + "property_vectors.pickle"
 results_csv = base_results_dir + "results.csv"
-
 course_id_prefix = "course:"
 user_id_prefix = "user:"
 target_id_prefix = "target:"
@@ -141,7 +140,7 @@ def compare(embedding_method):
     return pats
 
   # Get the user pairs
-  print("--- Generating user pairs")
+  print("--- Picking random user pairs")
   users = [x.name for x in get_concepts(user_id_prefix)]
   random.shuffle(users)
   user_pairs = list(zip(users[::2], users[1::2]))
@@ -174,10 +173,7 @@ def compare(embedding_method):
       v1 = property_vectors[p1]
       v2 = property_vectors[p2]
     # vec_dist = distance.euclidean(v1, v2)
-    # vec_dist = distance.cityblock(v1, v2)
     vec_dist = distance.cosine(v1, v2)
-    # vec_dist = distance.chebyshev(v1, v2)
-    # vec_dist = distance.jaccard(v1, v2)
     # vec_dist = fuzzy_jaccard(v1, v2)
     # vec_dist = tanimoto(v1, v2)
     row = [
@@ -288,12 +284,17 @@ def export_property_vectors():
     pickle.dump(property_vectors, f)
 
 def fuzzy_jaccard(v1, v2):
+  '''
+  This function is supposed to reflect the actual calculation done in the PLN rule.
+  Check out the 'intensional-similarity-direct-introduction-rule' for details.
+  '''
   numerator = 0
   denominator = 0
   for x, y in zip(v1, v2):
     # The "intersect"
     if x > 0 and y > 0:
       numerator = numerator + min(x,y)
+    # The "union"
     denominator = denominator + max(x,y)
   tvs = (numerator / denominator) if denominator > 0 else 0
   return tvs
