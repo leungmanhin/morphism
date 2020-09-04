@@ -25,6 +25,8 @@ The steps in an experiment involved:
 5) Calculate the correlation between the intensional similarities and vector distances calculated in the previous step
 
 # To Run
+First of all, please check out (then build and install) the branch of the PLN repo at https://github.com/leungmanhin/pln/tree/pln-morphism, which include a minor modification that considers the confidence of a TruthValue into the intensional similarity calculation all the time, to be a little more consistent.
+
 In this repository, there are two Python scripts, correspond to either the toy dataset that's made for testing purpose only, or the [Social Network: MOOC User Action Dataset](https://snap.stanford.edu/data/act-mooc.html).
 
 There is an additional script `main.py`, which is used to control what functions to be called for the experiment, e.g. load embeddings vs generate embeddings, be sure to check out what's in there, comment/uncomment out the parts that are needed or not, before running it via the following command:
