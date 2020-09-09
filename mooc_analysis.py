@@ -40,7 +40,7 @@ feature_prefix = "feature:"
 property_vectors = {}
 deepwalk = None
 num_sentences = 10000000
-num_walks = 15
+num_walks = 9
 
 ### Initialize the AtomSpace ###
 atomspace = AtomSpace()
