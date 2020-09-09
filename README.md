@@ -34,3 +34,5 @@ There is an additional script `main.py`, which is used to control what functions
 ```
 python3 -B main.py
 ```
+
+The results will be output to a CSV file under `results` directory.

@@ -17,6 +17,8 @@ from sklearn.decomposition import PCA, KernelPCA
 log.set_level("ERROR")
 
 base_results_dir = os.getcwd() + "/results/toy/"
+if not os.path.exists(base_results_dir):
+  os.makedirs(base_results_dir)
 
 member_links_scm = base_results_dir + "member-links.scm"
 evaluation_links_scm = base_results_dir + "evaluation-links.scm"
@@ -259,6 +261,8 @@ def do_pca():
 
 def export_all_atoms():
   def write_atoms_to_file(filename, atom_list_str):
+    if not os.path.exists(filename):
+      open(filename, "w").close()
     scm(" ".join([
       "(write-atoms-to-file",
       "\"" + filename + "\"",

@@ -18,6 +18,8 @@ log.set_level("ERROR")
 
 base_datasets_dir = os.getcwd() + "/datasets/"
 base_results_dir = os.getcwd() + "/results/mooc/"
+if not os.path.exists(base_results_dir):
+  os.makedirs(base_results_dir)
 
 mooc_actions_tsv = base_datasets_dir + "mooc_actions.tsv"
 mooc_action_labels_tsv = base_datasets_dir + "mooc_action_labels.tsv"
@@ -263,6 +265,8 @@ def do_pca():
 
 def export_all_atoms():
   def write_atoms_to_file(filename, atom_list_str):
+    if not os.path.exists(filename):
+      open(filename, "w").close()
     scm(" ".join([
       "(write-atoms-to-file",
       "\"" + filename + "\"",
