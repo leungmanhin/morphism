@@ -1,6 +1,7 @@
 ### Dataset to be used
-from toy_analysis import *
+# from toy_analysis import *
 # from mooc_analysis import *
+from go_analysis import *
 
 ### Different ways of building vectors are being explored
 # DW = DeepWalk
@@ -41,5 +42,5 @@ def get_results():
 # load_atoms()
 # load_embeddings()
 generate_atoms()
-generate_embeddings()
-get_results()
+# generate_embeddings()
+# get_results()
