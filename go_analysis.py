@@ -63,10 +63,12 @@ def build_property_vectors():
 
   for go_term in get_concepts(go_term_prefix):
     p_vec = []
-    for iset in go_term.incoming:
-      # Only looking at InheritanceLinks right now
-      if iset.type == types.InheritanceLink and iset.out[0] == go_term:
-        pat = iset.out[1]
+    for subset in atomspace.get_atoms_by_type(types.SubsetLink):
+      tv = subset.tv
+      # Only look at the ones loaded directly from data, i.e. having (stv 1 1),
+      # and excluded the inferred (inversed) ones
+      if tv.mean == 1 and tv.confidence == 1 and subset.out[0] == go_term:
+        pat = subset.out[1]
         attraction = AttractionLink(go_term, pat)
         attraction_tv = attraction.tv
         p_vec.append(attraction.tv.mean * attraction.tv.confidence)
