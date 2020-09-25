@@ -66,11 +66,11 @@ def build_property_vectors():
 
   global property_vectors
   all_evalinks = atomspace.get_atoms_by_type(types.EvaluationLink)
+  all_props = list(set([x.out[1].out[1] for x in all_evalinks]))
 
   for user in get_concepts(user_id_prefix):
     pvec = []
-    for e in all_evalinks:
-      prop = e.out[1].out[1]
+    for prop in all_props:
       attraction = AttractionLink(user, prop)
       attraction_tv = attraction.tv
       pvec.append(attraction.tv.mean * attraction.tv.confidence)

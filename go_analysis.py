@@ -59,19 +59,17 @@ scm(" ".join([
 
 def build_property_vectors():
   print("--- Building property vectors")
+
   global property_vectors
+  # Only look at the ones loaded directly from data, i.e. having (stv 1 1), and excluded the inferred (inversed) ones
+  all_pats = list(set([x.out[1] for x in atomspace.get_atoms_by_type(types.SubsetLink) if x.tv.mean == 1 and x.tv.confidence == 1]))
 
   for go_term in get_concepts(go_term_prefix):
     p_vec = []
-    for subset in atomspace.get_atoms_by_type(types.SubsetLink):
-      tv = subset.tv
-      # Only look at the ones loaded directly from data, i.e. having (stv 1 1),
-      # and excluded the inferred (inversed) ones
-      if tv.mean == 1 and tv.confidence == 1 and subset.out[0] == go_term:
-        pat = subset.out[1]
-        attraction = AttractionLink(go_term, pat)
-        attraction_tv = attraction.tv
-        p_vec.append(attraction.tv.mean * attraction.tv.confidence)
+    for pat in all_pats:
+      attraction = AttractionLink(go_term, pat)
+      attraction_tv = attraction.tv
+      p_vec.append(attraction.tv.mean * attraction.tv.confidence)
     property_vectors[go_term.name] = p_vec
 
 def calculate_truth_values():
