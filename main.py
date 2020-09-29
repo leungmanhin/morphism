@@ -42,5 +42,5 @@ def get_results():
 # load_atoms()
 # load_embeddings()
 generate_atoms()
-# generate_embeddings()
-# get_results()
+generate_embeddings()
+get_results()
