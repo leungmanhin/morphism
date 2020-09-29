@@ -4,6 +4,7 @@ import pickle
 import random
 from gensim.models import Word2Vec
 from matplotlib import pyplot
+import opencog.bioscience
 from opencog.atomspace import AtomSpace, types
 from opencog.bindlink import execute_atom
 from opencog.logger import log
@@ -96,8 +97,7 @@ def calculate_truth_values():
   # s = |A| / |universe|
   # c = |universe|
   # TODO: Register this Atom type in Python
-  GeneNode = 221
-  universe_size = len(atomspace.get_atoms_by_type(GeneNode))
+  universe_size = len(atomspace.get_atoms_by_type(types.GeneNode))
   tv_confidence = get_confidence(universe_size)
   for c in get_concepts(go_term_prefix):
     member_size = len(get_members(c))
