@@ -1,4 +1,5 @@
 import numpy
+from scipy import sparse
 import os
 import pickle
 import random
@@ -65,13 +66,16 @@ def build_property_vectors():
   # Only look at the ones loaded directly from data, i.e. having (stv 1 1), and excluded the inferred (inversed) ones
   all_pats = list(set([x.out[1] for x in atomspace.get_atoms_by_type(types.SubsetLink) if x.tv.mean == 1 and x.tv.confidence == 1]))
 
-  for go_term in get_concepts(go_term_prefix):
-    p_vec = []
-    for pat in all_pats:
-      attraction = AttractionLink(go_term, pat)
-      attraction_tv = attraction.tv
-      p_vec.append(attraction.tv.mean * attraction.tv.confidence)
-    property_vectors[go_term.name] = p_vec
+  for i, go_term in enumerate(get_concepts(go_term_prefix)):
+      p_vec = []
+      for pat in all_pats:
+          if pat.atomspace.is_link_in_atomspace(types.AttractionLink, [go_term, pat]):
+              attraction = AttractionLink(go_term, pat)
+              attraction_tv = attraction.tv
+              p_vec.append(attraction.tv.mean * attraction.tv.confidence)
+          else:
+              p_vec.append(0.0)
+      property_vectors[go_term.name] = sparse.csr_matrix(p_vec)
 
 def calculate_truth_values():
   print("--- Calculating Truth Values")
@@ -231,9 +235,11 @@ def do_kpca():
     cnt = 0
     total = X.shape[0] ** 2
     for a in X:
+      a = a.toarray().flatten()
       row = []
       j = 0
       for b in X:
+        b = b.toarray().flatten()
         cnt += 1
         print("--- Working on {}/{}...".format(cnt, total))
         if (i, j) in dist_dict:
@@ -252,7 +258,7 @@ def do_kpca():
 
   print("--- Doing KPCA")
 
-  X = numpy.array(list(property_vectors.values()))
+  X = sparse.vstack(property_vectors.values())
   X_kpca = KernelPCA(kernel = "precomputed").fit_transform(kernel_func(X))
 
   for k, kpca_v in zip(property_vectors.keys(), X_kpca):
