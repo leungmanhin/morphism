@@ -229,32 +229,33 @@ def compare(embedding_method):
 
 def do_kpca():
   def kernel_func(X):
-    dist_dict = {}
+    len_x = X.shape[0]
+    dist_array = numpy.random.random((len_x, len_x)).astype(numpy.float16) * 0 - 1.0
     mat = []
     i = 0
     cnt = 0
-    total = X.shape[0] ** 2
+    total = len_x ** 2
     for a in X:
       a = a.toarray().flatten()
       row = []
       j = 0
+      print("--- Working on {}/{}...".format(cnt, total))
       for b in X:
         b = b.toarray().flatten()
         cnt += 1
-        print("--- Working on {}/{}...".format(cnt, total))
-        if (i, j) in dist_dict:
-          row.append(dist_dict[(i, j)])
-        elif (j, i) in dist_dict:
-          row.append(dist_dict[(j, i)])
+        if 0 <= dist_array[i, j]:
+          row.append(dist_array[i, j])
+        elif 0 <= dist_array[j, i]:
+          row.append(dist_array[j, i])
         else:
           # dist = fuzzy_jaccard(a, b)
           dist = tanimoto(a, b)
           row.append(dist)
-          dist_dict[(i, j)] = dist
+          dist_array[i, j] = dist
         j += 1
-      mat.append(row)
+      mat.append(numpy.array(row).astype(numpy.float16))
       i += 1
-    return numpy.array(mat)
+    return numpy.array(mat, dtype=numpy.float16)
 
   print("--- Doing KPCA")
 
