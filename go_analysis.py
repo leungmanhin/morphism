@@ -7,9 +7,9 @@ from gensim.models import Word2Vec
 from matplotlib import pyplot
 import opencog.bioscience
 from opencog.atomspace import AtomSpace, types
-from opencog.bindlink import execute_atom
+from opencog.execute import execute_atom
 from opencog.logger import log
-from opencog.scheme_wrapper import scheme_eval
+from opencog.scheme import scheme_eval
 from opencog.type_constructors import *
 from opencog.utilities import initialize_opencog
 from scipy.spatial import distance
@@ -23,8 +23,8 @@ base_results_dir = os.getcwd() + "/results/go/"
 if not os.path.exists(base_results_dir):
   os.makedirs(base_results_dir)
 
-go_scm = base_datasets_dir + "GO_2020-04-01.scm"
-go_annotation_scm = base_datasets_dir + "GO_annotation_gene-level_2020-04-01.scm"
+go_scm = base_datasets_dir + "GO_2020-07-21.scm"
+go_annotation_scm = base_datasets_dir + "GO_annotation_gene-level_2020-07-21.scm"
 member_links_scm = base_results_dir + "member-links.scm"
 inheritance_links_scm = base_results_dir + "inheritance-links.scm"
 subset_links_scm = base_results_dir + "subset-links.scm"
@@ -32,6 +32,7 @@ attraction_links_scm = base_results_dir + "attraction-links.scm"
 sentences_pickle = base_results_dir + "sentences.pickle"
 deepwalk_bin = base_results_dir + "deepwalk.bin"
 results_csv = base_results_dir + "results.csv"
+property_vector_pickle = base_results_dir + "property_vector_pickle.pickle"
 
 go_term_prefix = "GO:"
 
@@ -141,8 +142,8 @@ def compare(embedding_method):
       # Only look at the ones loaded directly from data, i.e. having (stv 1 1),
       # and excluded the inferred (inversed) ones
       if tv.mean == 1 and tv.confidence == 1:
-        go_terms.add(subset.out[0].name)
-        go_terms.add(subset.out[1].name)
+        go_terms.add(subset.out[0])
+        go_terms.add(subset.out[1])
     return list(go_terms)
 
   node_pattern_dict = {}
@@ -174,8 +175,8 @@ def compare(embedding_method):
   for pair in go_pairs:
     go1 = pair[0]
     go2 = pair[1]
-    go1_properties = get_properties(ConceptNode(go1))
-    go2_properties = get_properties(ConceptNode(go2))
+    go1_properties = get_properties(go1)
+    go2_properties = get_properties(go2)
     go1_pattern_size = len(go1_properties)
     go2_pattern_size = len(go2_properties)
     common_properties = set(go1_properties).intersection(go2_properties)
@@ -319,7 +320,13 @@ def fuzzy_jaccard(v1, v2):
   return tvs
 
 def get_concepts(str_prefix):
-  return [x for x in atomspace.get_atoms_by_type(types.ConceptNode) if x.name.startswith(str_prefix)]
+  if str_prefix == "GO:":
+    cc = atomspace.get_atoms_by_type(types.CellularComponentNode)
+    mf = atomspace.get_atoms_by_type(types.MolecularFunctionNode)
+    bp = atomspace.get_atoms_by_type(types.BiologicalProcessNode)
+    return cc + mf + bp
+  else:
+    return [x for x in atomspace.get_atoms_by_type(types.ConceptNode) if x.name.startswith(str_prefix)]
 
 def infer_attractions():
   print("--- Inferring AttractionLinks")
@@ -332,8 +339,8 @@ def infer_attractions():
                   "(Attraction (Variable \"$X\") (Variable \"$Y\"))",
                   "#:vardecl",
                     "(VariableSet",
-                      "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
-                      "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+                      "(TypedVariable (Variable \"$X\") (TypeInh \"ConceptNode\"))",
+                      "(TypedVariable (Variable \"$Y\") (TypeInh \"ConceptNode\")))",
                   "#:maximum-iterations 12",
                   "#:complexity-penalty 10)"]))
 
@@ -353,20 +360,17 @@ def generate_subsets():
       "(Inheritance (Variable \"$X\") (Variable \"$Y\"))",
       "#:vardecl",
         "(VariableSet",
-          "(TypedVariable (Variable \"$X\") (Type \"ConceptNode\"))",
-          "(TypedVariable (Variable \"$Y\") (Type \"ConceptNode\")))",
+          "(TypedVariable (Variable \"$X\") (TypeInh \"ConceptNode\"))",
+          "(TypedVariable (Variable \"$Y\") (TypeInh \"ConceptNode\")))",
       "#:maximum-iterations 12",
       "#:fc-full-rule-application #t)"]))
 
 def intensional_similarity(c1, c2):
-  cn1 = "(Concept \"{}\")".format(c1)
-  cn2 = "(Concept \"{}\")".format(c2)
-  intsim = "(IntensionalSimilarity {} {})".format(cn1, cn2)
+  intsim = "(IntensionalSimilarity {} {})".format(c1, c2)
   scm("(pln-bc {})".format(intsim))
   tv_mean = float(scm("(cog-mean {})".format(intsim)))
   tv_conf = float(scm("(cog-confidence {})".format(intsim)))
   return TruthValue(tv_mean, tv_conf)
-
 def load_all_atoms():
   print("--- Loading Atoms from files")
   scm("(use-modules (opencog persist-file))")

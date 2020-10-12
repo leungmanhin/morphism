@@ -3,7 +3,7 @@
 (load-from-path "rules/rule-utils.scm")
 
 ;; Helpers
-(define ConceptT (Type "ConceptNode"))
+(define ConceptT (TypeInh "ConceptNode"))
 (define GeneT (Type "GeneNode"))
 
 ;; Inheritance to Subset
