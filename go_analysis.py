@@ -76,6 +76,7 @@ def build_property_vectors():
               p_vec.append(attraction.tv.mean * attraction.tv.confidence)
           else:
               p_vec.append(0.0)
+      assert sum(p_vec), 'got zero vector for {0}'.format(go_term)
       property_vectors[go_term.name] = sparse.csr_matrix(p_vec)
 
 def calculate_truth_values():
